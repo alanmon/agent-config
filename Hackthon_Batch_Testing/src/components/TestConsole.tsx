@@ -122,7 +122,7 @@ export default function TestConsole({
         <KsEmptyState
           autoCenter
           title="No test questions added"
-          description="Check for conflicting rules and knowledge gaps by adding test questions manually, auto-generating a batch, or uploading a CSV file."
+          description="Check for conflicting rules and knowledge gaps by adding test questions manually, auto-generating a batch, or importing questions from a CSV file."
           footer={
             <div className="empty-actions">
               <KsButton variant="primary" size="md" onClick={() => onAddAction('manual')}>
