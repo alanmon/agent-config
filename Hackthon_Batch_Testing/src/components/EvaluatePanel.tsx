@@ -104,8 +104,8 @@ export default function EvaluatePanel({ question, evaluated, onClose }: Props) {
         <KsEmptyState
           autoCenter
           size="sm"
-          title="No question selected"
-          description="Select a question to see how your agent responds, check its sources, and fix any issues."
+          title="No questions selected"
+          description="Select questions to see how your agent responds, and fix issues."
         />
       ) : !showResult ? (
         <div className="eval-body">

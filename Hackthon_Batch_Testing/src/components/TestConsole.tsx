@@ -122,7 +122,7 @@ export default function TestConsole({
         <KsEmptyState
           autoCenter
           title="No test questions added"
-          description="Check for conflicting rules and knowledge gaps by adding test questions manually, auto-generating a batch, or importing questions from a CSV file."
+          description="Add test questions to check for conflicting rules and knowledge gaps."
           footer={
             <div className="empty-actions">
               <KsButton variant="primary" size="md" onClick={() => onAddAction('manual')}>
@@ -137,7 +137,7 @@ export default function TestConsole({
               </KsButton>
               <KsButton variant="default" size="md" onClick={() => onAddAction('csv')}>
                 <span className="chip-inner">
-                  <KsIconColoredExcel size="16" /> Import from CSV file
+                  <KsIconColoredExcel size="16" /> Import CSV
                 </span>
               </KsButton>
             </div>
