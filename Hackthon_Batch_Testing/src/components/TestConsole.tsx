@@ -98,7 +98,7 @@ export default function TestConsole({
             </KsButton>
             <KsDropdownButton variant="default" size="md" options={addQuestionsOptions(onAddAction)}>
               <span className="chip-inner">
-                <KsIconPlus size="16" /> Add questions <KsIconChevronDown size="14" />
+                <KsIconPlus size="16" /> Add question
               </span>
             </KsDropdownButton>
             <KsButton
@@ -110,7 +110,7 @@ export default function TestConsole({
             >
               <span className="chip-inner">
                 <KsIconPlayCircle size="16" />
-                {running ? 'Running…' : 'Run evaluation'}
+                {running ? 'Running…' : 'Run test'}
               </span>
             </KsButton>
           </div>
@@ -121,8 +121,8 @@ export default function TestConsole({
       {group.questions.length === 0 ? (
         <KsEmptyState
           autoCenter
-          title="No test questions yet"
-          description="Add questions to start testing how your agent responds — write your own, generate them from your knowledge base, or import a list."
+          title="No test questions added"
+          description="Check for conflicting rules and knowledge gaps by adding test questions manually, auto-generating a batch, or uploading a CSV file."
           footer={
             <div className="empty-actions">
               <KsButton variant="primary" size="md" onClick={() => onAddAction('manual')}>
@@ -132,12 +132,12 @@ export default function TestConsole({
               </KsButton>
               <KsButton variant="default" size="md" onClick={() => onAddAction('generate')}>
                 <span className="chip-inner">
-                  <KsIconWand size="16" /> Generate questions
+                  <KsIconWand size="16" /> Auto-generate
                 </span>
               </KsButton>
               <KsButton variant="default" size="md" onClick={() => onAddAction('csv')}>
                 <span className="chip-inner">
-                  <KsIconColoredExcel size="16" /> Import from a .csv
+                  <KsIconColoredExcel size="16" /> Import from CSV file
                 </span>
               </KsButton>
             </div>

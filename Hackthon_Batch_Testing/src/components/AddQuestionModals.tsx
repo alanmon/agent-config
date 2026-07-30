@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { KsModal, KsCheckbox, KsInput } from '@byted-keystone/react';
 import { CATEGORIES, questionBank, type TestQuestion } from '../data';
 
@@ -52,8 +52,8 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
   return (
     <KsModal
       open={open}
-      title="Generate questions"
-      description="Generated from your knowledge base and connected docs. Select the ones you want to add to this test."
+      title="Auto-generate questions"
+      description="These questions are generated from your sources and knowledge base. Select the ones you want to test."
       size="lg"
       width={640}
       confirmable
@@ -135,12 +135,12 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
   return (
     <KsModal
       open={open}
-      title="Add a question manually"
-      description="Write the exact question you want to test against the agent."
+      title="Add questions manually"
+      description="Enter customer questions to see how your agent responds."
       size="md"
       confirmable
       cancelable
-      confirmText="Add question"
+      confirmText="Add"
       cancelText="Cancel"
       onConfirm={handleConfirm}
       onCancel={handleCancel}
@@ -148,7 +148,7 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
       body={
         <div className="manual-modal-body">
           <KsInput
-            placeholder="e.g. Can I get filler if I'm currently breastfeeding?"
+            placeholder="e.g. How long do lip filler results usually last?"
             value={text}
             onChange={(value: string) => setText(value)}
           />
@@ -161,7 +161,7 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
 interface ComingSoonProps {
   open: boolean;
   title: string;
-  description: string;
+  description: ReactNode;
   onCancel: () => void;
 }
 

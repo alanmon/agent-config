@@ -89,7 +89,7 @@ export default function EvaluatePanel({ question, evaluated, onClose }: Props) {
   return (
     <section className="panel evaluate" aria-label="Evaluate answer">
       <div className="eval-head">
-        <span className="eval-title">Evaluate answer</span>
+        <span className="eval-title">Evaluate agent responses</span>
         <div className="eval-head-actions">
           <KsIconButton variant="text" size="sm" aria-label="Regenerate" disabled={!question}>
             <KsIconRefresh size="18" />
@@ -105,7 +105,7 @@ export default function EvaluatePanel({ question, evaluated, onClose }: Props) {
           autoCenter
           size="sm"
           title="No question selected"
-          description="Add a question and select it from the list to see its evaluation here."
+          description="Select a question to see how your agent responds, check its sources, and fix any issues."
         />
       ) : !showResult ? (
         <div className="eval-body">
