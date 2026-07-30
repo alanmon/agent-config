@@ -1,5 +1,5 @@
 import { useState, Fragment, type ReactNode } from 'react';
-import { KsIconButton, KsButton, KsInput, KsStatusDot } from '@byted-keystone/react';
+import { KsIconButton, KsButton, KsInput, KsStatusDot, KsEmptyState, KsTag } from '@byted-keystone/react';
 import {
   KsIconRefresh,
   KsIconClose,
@@ -7,6 +7,7 @@ import {
   KsIconChevronRight,
   KsIconNotes,
   KsIconBookmark,
+  KsIconPlayCircle,
 } from '@fe-infra/keystone-icons-react';
 import type { AnswerSource, Rating, TestQuestion } from '../data';
 
@@ -26,6 +27,11 @@ const ratingButtons: { key: Rating; label: string; kbd: string; dot: 'success' |
   { key: 'acceptable', label: 'Acceptable', kbd: 'A', dot: 'warning' },
   { key: 'poor', label: 'Poor', kbd: 'P', dot: 'error' },
 ];
+
+const rootCauseVariant: Record<string, 'warning' | 'error'> = {
+  'Knowledge gap': 'warning',
+  'Instruction conflict': 'error',
+};
 
 function UsesRow({ label, items }: { label: string; items: AnswerSource[] }) {
   const [open, setOpen] = useState(false);
@@ -70,19 +76,22 @@ function UsesRow({ label, items }: { label: string; items: AnswerSource[] }) {
 }
 
 interface Props {
-  question: TestQuestion;
+  question: TestQuestion | null;
+  evaluated: boolean;
   onClose?: () => void;
 }
 
-export default function EvaluatePanel({ question, onClose }: Props) {
-  const [rating, setRating] = useState<Rating>(question.rating);
+export default function EvaluatePanel({ question, evaluated, onClose }: Props) {
+  const [rating, setRating] = useState<Rating | null>(question?.rating ?? null);
+
+  const showResult = evaluated && !!question?.status;
 
   return (
     <section className="panel evaluate" aria-label="Evaluate answer">
       <div className="eval-head">
-        <span className="eval-title">Evaluate answer</span>
+        <span className="eval-title">Evaluate agent responses</span>
         <div className="eval-head-actions">
-          <KsIconButton variant="text" size="sm" aria-label="Regenerate">
+          <KsIconButton variant="text" size="sm" aria-label="Regenerate" disabled={!question}>
             <KsIconRefresh size="18" />
           </KsIconButton>
           <KsIconButton variant="text" size="sm" aria-label="Close" onClick={onClose}>
@@ -91,53 +100,91 @@ export default function EvaluatePanel({ question, onClose }: Props) {
         </div>
       </div>
 
-      <div className="eval-body">
-        <div className="chat-question">{question.question}</div>
-
-        <div className="fin-answer">
-          <div className="fin-label">
-            <span className="fin-mark">
-              <KsIconWand size="14" />
-            </span>
-            Fin • AI Agent
-          </div>
-          <div className="fin-answer-text">{renderRich(question.answer)}</div>
-        </div>
-
-        <div className="uses-label">This answer uses:</div>
-        <UsesRow label="Content" items={question.content} />
-        <UsesRow label="Guidance" items={question.guidance} />
-      </div>
-
-      <div className="rate-section">
-        <div className="rate-title">Rate Fin&rsquo;s response</div>
-        <div className="rate-desc">
-          Your rating will be saved in the report download. You can also add a note for yourself or
-          your team.
-        </div>
-        <div className="rate-buttons">
-          {ratingButtons.map((b) => (
-            <div className="rate-button-slot" key={b.key}>
-              <KsButton
-                className="rate-button"
-                variant="default"
-                size="md"
-                forceActive={rating === b.key}
-                onClick={() => setRating(b.key)}
-              >
-                <span className="rate-btn-inner">
-                  <KsStatusDot variant={b.dot} size="sm" />
-                  {b.label}
-                  <span className="kbd">{b.kbd}</span>
+      {!question ? (
+        <KsEmptyState
+          autoCenter
+          size="sm"
+          title="No questions selected"
+          description="Select questions to see how your agent responds, and fix issues."
+        />
+      ) : !showResult ? (
+        <div className="eval-body">
+          <div className="chat-question">{question.question}</div>
+          <div className="eval-waiting">
+            <KsEmptyState
+              size="sm"
+              title="Not yet evaluated"
+              description="Click “Run evaluation” to generate this answer and grade it as Pass, Failure, or Knowledge gap."
+              footer={
+                <span className="eval-waiting-hint">
+                  <KsIconPlayCircle size="16" /> Waiting for evaluation
                 </span>
-              </KsButton>
+              }
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="eval-body">
+            <div className="chat-question">{question.question}</div>
+
+            {question.rootCause && (
+              <div className={`root-cause root-cause-${rootCauseVariant[question.rootCause.label] ?? 'warning'}`}>
+                <div className="root-cause-head">
+                  <KsTag variant={rootCauseVariant[question.rootCause.label] ?? 'warning'} size="sm">
+                    {question.rootCause.label}
+                  </KsTag>
+                </div>
+                <div className="root-cause-detail">{question.rootCause.detail}</div>
+              </div>
+            )}
+
+            <div className="fin-answer">
+              <div className="fin-label">
+                <span className="fin-mark">
+                  <KsIconWand size="14" />
+                </span>
+                Fin • AI Agent
+              </div>
+              <div className="fin-answer-text">{renderRich(question.answer)}</div>
             </div>
-          ))}
-        </div>
-        <div className="rate-note">
-          <KsInput placeholder="Add internal note" />
-        </div>
-      </div>
+
+            <div className="uses-label">This answer uses:</div>
+            <UsesRow label="Content" items={question.content} />
+            <UsesRow label="Guidance" items={question.guidance} />
+          </div>
+
+          <div className="rate-section">
+            <div className="rate-title">Rate Fin&rsquo;s response</div>
+            <div className="rate-desc">
+              Your rating will be saved in the report download. You can also add a note for yourself or
+              your team.
+            </div>
+            <div className="rate-buttons">
+              {ratingButtons.map((b) => (
+                <div className="rate-button-slot" key={b.key}>
+                  <KsButton
+                    className="rate-button"
+                    variant="default"
+                    size="md"
+                    forceActive={rating === b.key}
+                    onClick={() => setRating(b.key)}
+                  >
+                    <span className="rate-btn-inner">
+                      <KsStatusDot variant={b.dot} size="sm" />
+                      {b.label}
+                      <span className="kbd">{b.kbd}</span>
+                    </span>
+                  </KsButton>
+                </div>
+              ))}
+            </div>
+            <div className="rate-note">
+              <KsInput placeholder="Add internal note" />
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

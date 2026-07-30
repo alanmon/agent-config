@@ -1,4 +1,4 @@
-import { KsButton, KsCheckbox, KsAvatar, KsDropdownButton, KsTag } from '@byted-keystone/react';
+import { KsButton, KsCheckbox, KsAvatar, KsDropdownButton, KsTag, KsEmptyState } from '@byted-keystone/react';
 import {
   KsIconNotes,
   KsIconChevronDown,
@@ -6,36 +6,63 @@ import {
   KsIconPlus,
   KsIconChangeUser,
   KsIconHelp,
-  KsIconStar,
-  KsIconCheckMark,
+  KsIconWand,
+  KsIconColoredExcel,
+  KsIconFilledCheck,
+  KsIconFilledClose,
+  KsIconFilledWarning,
+  KsIconPlayCircle,
 } from '@fe-infra/keystone-icons-react';
-import type { Rating, TestGroup, TestQuestion } from '../data';
-
-const ratingTag: Record<Rating, { variant: 'success' | 'warning' | 'error'; label: string }> = {
-  good: { variant: 'success', label: 'Good' },
-  acceptable: { variant: 'warning', label: 'Acceptable' },
-  poor: { variant: 'error', label: 'Poor' },
-};
+import type { EvalStatus, TestGroup, TestQuestion } from '../data';
 
 const testingAsOptions = [
   { value: 'preview', label: 'Preview user' },
   { value: 'new', label: 'New user' },
   { value: 'existing', label: 'Existing user' },
 ];
-const ratingOptions = [
-  { value: 'any', label: 'Any' },
-  { value: 'good', label: 'Good' },
-  { value: 'acceptable', label: 'Acceptable' },
-  { value: 'poor', label: 'Poor' },
+
+type AddAction = 'manual' | 'generate' | 'csv' | 'inbox';
+
+const addQuestionsOptions = (onSelect: (action: AddAction) => void) => [
+  { value: 'manual', label: 'Add manually', onClick: () => onSelect('manual') },
+  { value: 'generate', label: 'Generate questions', onClick: () => onSelect('generate') },
+  { value: 'csv', label: 'Import from a .csv', onClick: () => onSelect('csv') },
+  { value: 'inbox', label: 'Import from inbox', onClick: () => onSelect('inbox') },
 ];
+
+const statusTag: Record<EvalStatus, { variant: 'success' | 'warning' | 'error'; label: string }> = {
+  pass: { variant: 'success', label: 'Pass' },
+  knowledge_gap: { variant: 'warning', label: 'Knowledge gap' },
+  failure: { variant: 'error', label: 'Failure' },
+};
 
 interface Props {
   group: TestGroup;
-  selectedId: string;
+  selectedId: string | null;
   onSelect: (q: TestQuestion) => void;
+  onAddAction: (action: AddAction) => void;
+  evaluated: boolean;
+  running: boolean;
+  onRunEvaluation: () => void;
 }
 
-export default function TestConsole({ group, selectedId, onSelect }: Props) {
+export default function TestConsole({
+  group,
+  selectedId,
+  onSelect,
+  onAddAction,
+  evaluated,
+  running,
+  onRunEvaluation,
+}: Props) {
+  const counts = group.questions.reduce(
+    (acc, q) => {
+      if (q.status) acc[q.status] += 1;
+      return acc;
+    },
+    { pass: 0, knowledge_gap: 0, failure: 0 } as Record<EvalStatus, number>
+  );
+
   return (
     <section className="panel console" aria-label="Test console">
       {/* Header */}
@@ -69,9 +96,21 @@ export default function TestConsole({ group, selectedId, onSelect }: Props) {
                 <KsIconEdit size="16" /> Manage <KsIconChevronDown size="14" />
               </span>
             </KsButton>
-            <KsButton variant="primary" size="md">
+            <KsDropdownButton variant="default" size="md" options={addQuestionsOptions(onAddAction)}>
               <span className="chip-inner">
-                <KsIconPlus size="16" /> Add questions <KsIconChevronDown size="14" />
+                <KsIconPlus size="16" /> Add question
+              </span>
+            </KsDropdownButton>
+            <KsButton
+              variant="primary"
+              size="md"
+              disabled={group.questions.length === 0}
+              loading={running}
+              onClick={onRunEvaluation}
+            >
+              <span className="chip-inner">
+                <KsIconPlayCircle size="16" />
+                {running ? 'Running…' : 'Run test'}
               </span>
             </KsButton>
           </div>
@@ -79,71 +118,105 @@ export default function TestConsole({ group, selectedId, onSelect }: Props) {
         <hr className="console-divider" />
       </div>
 
-      {/* Filters */}
-      <div className="filter-row">
-        <div className="testing-as">
-          <span>Testing as</span>
-          <KsDropdownButton variant="tertiary" size="sm" options={testingAsOptions}>
-            <span className="chip-inner">
-              <KsIconChangeUser size="16" /> Preview user
-            </span>
-          </KsDropdownButton>
-        </div>
-        <KsDropdownButton variant="default" size="sm" options={ratingOptions}>
-          <span className="chip-inner">
-            <KsIconStar size="16" /> Answer rating is Any
-          </span>
-        </KsDropdownButton>
-      </div>
-
-      {/* Count */}
-      <div className="q-count">{group.questions.length} questions</div>
-
-      {/* Table header */}
-      <div className="q-head">
-        <span className="q-check">
-          <KsCheckbox size="sm" />
-        </span>
-        <span>Question</span>
-        <span className="th">
-          Answer status <KsIconHelp size="14" />
-        </span>
-        <span className="th">
-          Answer rating <KsIconHelp size="14" />
-        </span>
-      </div>
-
-      {/* Rows */}
-      <div className="q-list">
-        {group.questions.map((q) => {
-          const tag = ratingTag[q.rating];
-          return (
-            <div
-              key={q.id}
-              className={`q-row ${selectedId === q.id ? 'is-selected' : ''}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelect(q)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') onSelect(q);
-              }}
-            >
-              <span className="q-check" onClick={(e) => e.stopPropagation()}>
-                <KsCheckbox size="sm" />
-              </span>
-              <span className="q-question">{q.question}</span>
-              <span className="q-status">
-                {q.answered && <KsIconCheckMark size="18" />}
-              </span>
-              <span>
-                <KsTag variant={tag.variant} size="sm">
-                  {tag.label}
-                </KsTag>
-              </span>
+      {group.questions.length === 0 ? (
+        <KsEmptyState
+          autoCenter
+          title="No test questions added"
+          description="Add test questions to check for conflicting rules and knowledge gaps."
+          footer={
+            <div className="empty-actions">
+              <KsButton variant="primary" size="md" onClick={() => onAddAction('manual')}>
+                <span className="chip-inner">
+                  <KsIconEdit size="16" /> Add manually
+                </span>
+              </KsButton>
+              <KsButton variant="default" size="md" onClick={() => onAddAction('generate')}>
+                <span className="chip-inner">
+                  <KsIconWand size="16" /> Auto-generate
+                </span>
+              </KsButton>
+              <KsButton variant="default" size="md" onClick={() => onAddAction('csv')}>
+                <span className="chip-inner">
+                  <KsIconColoredExcel size="16" /> Import CSV
+                </span>
+              </KsButton>
             </div>
-          );
-        })}
-      </div>
+          }
+        />
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="filter-row">
+            <div className="testing-as">
+              <span>Testing as</span>
+              <KsDropdownButton variant="tertiary" size="sm" options={testingAsOptions}>
+                <span className="chip-inner">
+                  <KsIconChangeUser size="16" /> Preview user
+                </span>
+              </KsDropdownButton>
+            </div>
+          </div>
+
+          {/* Count + summary */}
+          <div className="q-count-row">
+            <div className="q-count">{group.questions.length} questions</div>
+            {evaluated && (
+              <div className="summary-strip">
+                <span className="summary-chip pass">
+                  <KsIconFilledCheck size="14" /> Pass <b>{counts.pass}</b>
+                </span>
+                <span className="summary-chip kg">
+                  <KsIconFilledWarning size="14" /> Knowledge gap <b>{counts.knowledge_gap}</b>
+                </span>
+                <span className="summary-chip fail">
+                  <KsIconFilledClose size="14" /> Failure <b>{counts.failure}</b>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Table header */}
+          <div className="q-head">
+            <span className="q-check">
+              <KsCheckbox size="sm" />
+            </span>
+            <span>Question</span>
+            <span className="th">
+              Answer status <KsIconHelp size="14" />
+            </span>
+            <span className="th">
+              Result <KsIconHelp size="14" />
+            </span>
+          </div>
+
+          {/* Rows */}
+          <div className="q-list">
+            {group.questions.map((q) => {
+              const resultKnown = evaluated && q.status;
+              const tag = resultKnown ? statusTag[q.status as EvalStatus] : null;
+              return (
+                <div
+                  key={q.id}
+                  className={`q-row ${selectedId === q.id ? 'is-selected' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelect(q)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') onSelect(q);
+                  }}
+                >
+                  <span className="q-check" onClick={(e) => e.stopPropagation()}>
+                    <KsCheckbox size="sm" />
+                  </span>
+                  <span className="q-question">{q.question}</span>
+                  <span className="q-status">{resultKnown && <KsIconFilledCheck size="18" />}</span>
+                  <span>{tag ? <KsTag variant={tag.variant} size="sm">{tag.label}</KsTag> : <span className="q-status-empty">—</span>}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </section>
   );
 }
