@@ -664,11 +664,17 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* 18px + the 6px inner padding on rows = 24px, matching the modal
+     header/footer padding, while letting row hover bleed 6px wider. */
+  padding: 0 18px;
 }
 .gen-modal-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  /* margin (not padding) so the divider spans exactly the header's width
+     instead of bleeding into the rows' 6px hover gutter. */
+  margin: 0 6px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
@@ -692,6 +698,7 @@ body {
   letter-spacing: 0.03em;
   color: var(--text-muted);
   margin-bottom: 6px;
+  padding: 0 6px;
 }
 .gen-modal-row {
   display: flex;
@@ -711,8 +718,63 @@ body {
 .gen-modal-empty {
   color: var(--text-muted);
   font-size: 13px;
-  padding: 12px 0;
+  padding: 12px 6px;
 }
 .manual-modal-body {
-  padding-top: 4px;
+  padding: 4px 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.manual-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.manual-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.manual-row-field {
+  flex: 1;
+  min-width: 0;
+}
+.manual-row-field > * {
+  display: block;
+  width: 100%;
+}
+.manual-row-remove {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.manual-row-remove:hover:not(:disabled) {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+.manual-row-remove:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.manual-modal-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.manual-modal-count {
+  color: var(--text-muted);
+  font-size: 13px;
 }

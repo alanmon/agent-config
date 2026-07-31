@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { KsModal, KsCheckbox, KsInput } from '@byted-keystone/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { KsModal, KsCheckbox, KsInput, KsButton } from '@byted-keystone/react';
+import { KsIconDelete, KsIconPlus } from '@fe-infra/keystone-icons-react';
 import { CATEGORIES, questionBank, type TestQuestion } from '../data';
 
 interface GenerateProps {
@@ -112,46 +113,132 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
 interface AddManuallyProps {
   open: boolean;
   onCancel: () => void;
-  onConfirm: (question: string) => void;
+  onConfirm: (questions: string[]) => void;
 }
 
-/** Single free-text question entry. */
+interface Draft {
+  id: number;
+  text: string;
+}
+
+const emptyDrafts = (): Draft[] => [{ id: 0, text: '' }];
+
+/** Free-text entry that stages several questions before adding them in one go. */
 export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps) {
-  const [text, setText] = useState('');
+  const nextId = useRef(1);
+  const [drafts, setDrafts] = useState<Draft[]>(emptyDrafts);
+  // Row to focus once it has mounted, so Enter flows straight into the new input.
+  const [focusId, setFocusId] = useState<number | null>(null);
+  const inputs = useRef(new Map<number, HTMLKsInputElement>());
+
+  // KsInput ignores autoFocus after first paint, and its shadow <input> isn't
+  // there yet on commit — focus it imperatively on the next frame instead.
+  useEffect(() => {
+    if (focusId === null) return;
+    const el = inputs.current.get(focusId);
+    setFocusId(null);
+    if (!el) return;
+    const frame = requestAnimationFrame(() => el.focusInput?.());
+    return () => cancelAnimationFrame(frame);
+  }, [focusId]);
+
+  const filled = drafts.map((d) => d.text.trim()).filter(Boolean);
+
+  const reset = () => {
+    nextId.current = 1;
+    setDrafts(emptyDrafts());
+    setFocusId(null);
+  };
+
+  const update = (id: number, text: string) =>
+    setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, text } : d)));
+
+  const addRow = () => {
+    const id = nextId.current++;
+    setDrafts((prev) => [...prev, { id, text: '' }]);
+    setFocusId(id);
+  };
+
+  // Keep at least one row on screen — clear the last one instead of removing it.
+  const removeRow = (id: number) =>
+    setDrafts((prev) => (prev.length === 1 ? emptyDrafts() : prev.filter((d) => d.id !== id)));
 
   const handleConfirm = () => {
-    const trimmed = text.trim();
-    if (!trimmed) return false;
-    onConfirm(trimmed);
-    setText('');
+    if (filled.length === 0) return false;
+    onConfirm(filled);
+    reset();
     return undefined;
   };
 
   const handleCancel = () => {
-    setText('');
+    reset();
     onCancel();
   };
 
   return (
     <KsModal
       open={open}
-      title="Add a question manually"
-      description="Write the exact question you want to test against the agent."
+      title="Add questions manually"
+      description="Write the exact questions you want to test against the agent. Press Enter to start another."
       size="md"
       confirmable
       cancelable
-      confirmText="Add question"
+      confirmText={filled.length > 1 ? `Add ${filled.length} questions` : 'Add question'}
       cancelText="Cancel"
       onConfirm={handleConfirm}
       onCancel={handleCancel}
-      partProps={{ confirmButton: { disabled: text.trim().length === 0 } }}
+      partProps={{ confirmButton: { disabled: filled.length === 0 } }}
       body={
         <div className="manual-modal-body">
-          <KsInput
-            placeholder="e.g. Can I get filler if I'm currently breastfeeding?"
-            value={text}
-            onChange={(value: string) => setText(value)}
-          />
+          <div className="manual-rows">
+            {drafts.map((d, i) => (
+              <div className="manual-row" key={d.id}>
+                {/* KsInput types an onKeydownEnter event but never emits it, so
+                    listen for the native keydown that bubbles out of its shadow root. */}
+                <div
+                  className="manual-row-field"
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    if (d.text.trim() && i === drafts.length - 1) addRow();
+                  }}
+                >
+                  <KsInput
+                    ref={(el: HTMLKsInputElement | null) => {
+                      if (el) inputs.current.set(d.id, el);
+                      else inputs.current.delete(d.id);
+                    }}
+                    placeholder={
+                      i === 0
+                        ? "e.g. Can I get filler if I'm currently breastfeeding?"
+                        : 'Add another question'
+                    }
+                    value={d.text}
+                    onChange={(value: string) => update(d.id, value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="manual-row-remove"
+                  aria-label="Remove question"
+                  disabled={drafts.length === 1 && d.text.length === 0}
+                  onClick={() => removeRow(d.id)}
+                >
+                  <KsIconDelete size="16" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="manual-modal-footer-row">
+            <KsButton variant="text" size="sm" onClick={addRow}>
+              <span className="chip-inner">
+                <KsIconPlus size="14" /> Add another question
+              </span>
+            </KsButton>
+            <span className="manual-modal-count">
+              {filled.length} ready to add
+            </span>
+          </div>
         </div>
       }
     />
