@@ -8,7 +8,12 @@
  */
 
 /** Manual human rating, set from the Evaluate panel. Independent of `status`. */
-export type Rating = 'good' | 'acceptable' | 'poor';
+/**
+ * The reviewer's take on the system's own verdict. The system attributes the
+ * root cause itself, so the human's job is to confirm or dispute that call —
+ * not to grade the answer a second time.
+ */
+export type ReviewVerdict = 'agree' | 'disagree';
 
 /** Automated evaluation outcome, revealed by "Run evaluation". */
 export type EvalStatus = 'pass' | 'knowledge_gap' | 'failure';
@@ -41,6 +46,23 @@ export interface RootCause {
   detail: string;
 }
 
+/**
+ * How one configured rule fared on this question. Drives the Instructions
+ * section — the instruction-level traceability the demo is built around.
+ */
+export interface InstructionTrace {
+  rule: string;
+  status: 'followed' | 'violated';
+  detail: string;
+}
+
+/** What the system recommends doing about the root cause. */
+export interface FixSuggestion {
+  /** Short imperative, e.g. "Merge conflicting rules". */
+  action: string;
+  detail: string;
+}
+
 export interface TestQuestion {
   id: string;
   category: Category;
@@ -48,16 +70,25 @@ export interface TestQuestion {
   question: string;
   /** Evaluation outcome. `null` until "Run evaluation" has been clicked. */
   status: EvalStatus | null;
-  /** Manual human rating, set from the Evaluate panel. `null` until set. */
-  rating: Rating | null;
+  /** Reviewer's verdict on the system's diagnosis. `null` until reviewed. */
+  review: ReviewVerdict | null;
   /** Agent response. Supports **bold** and emoji. Empty until evaluated. */
   answer: string;
   /** Items grouped under "Content (n)". */
   content: AnswerSource[];
-  /** Items grouped under "Guidance (n)". */
+  /** Items grouped under "Guidance (n)". Cited sources only — never violated rules. */
   guidance: AnswerSource[];
   /** Present for `knowledge_gap` / `failure` outcomes. */
   rootCause?: RootCause;
+  /**
+   * Rule-by-rule trace. Only authored for the two scenarios the hackathon
+   * story defines; the Instructions section stays hidden when absent.
+   */
+  instructions?: InstructionTrace[];
+  /** Only authored for the two story scenarios. Section hidden when absent. */
+  fixSuggestion?: FixSuggestion;
+  /** Retrieval evidence shown in Sources when nothing was found. */
+  searchEvidence?: string;
 }
 
 export interface TestGroup {
@@ -70,13 +101,79 @@ export interface TestGroup {
 
 /** Full candidate pool offered by "Generate questions". Not yet evaluated. */
 export const questionBank: TestQuestion[] = [
+  // ---------- Demo scenarios ----------
+  // Kept at the head of the bank so they land at the top of the test list:
+  // these are the two questions the hackathon story walks through, and the
+  // only two with full instruction traces and fix suggestions.
+  {
+    id: 'g3',
+    category: 'General',
+    question: "Can I get liposuction if I'm taking blood thinners?",
+    status: 'knowledge_gap',
+    review: null,
+    answer:
+      'That’s worth discussing with your provider — blood thinners can affect bruising and healing, so we’ll want to look at your specific medication.',
+    content: [],
+    guidance: [],
+    searchEvidence: 'Searched 142 documents · 0 matches for “blood thinners contraindication”',
+    rootCause: {
+      label: 'Knowledge gap',
+      detail:
+        'No medication-contraindication article exists for anticoagulants and liposuction/injectables eligibility. Nothing in the knowledge base covers this combination.',
+    },
+    fixSuggestion: {
+      action: 'Create a medication contraindications KB article',
+      detail:
+        'Add a knowledge base article covering which medications — anticoagulants in particular — contraindicate liposuction and injectable treatments, so this class of question stops falling through.',
+    },
+  },
+  {
+    id: 'g4',
+    category: 'General',
+    question:
+      'I want to book a liposuction appointment for next Tuesday. My friend got it done and looked amazing!',
+    status: 'failure',
+    review: null,
+    answer:
+      'Great! I’ve booked your liposuction appointment for Tuesday at 2 PM. You’ll love the results — liposuction is one of our most popular procedures!',
+    content: [],
+    guidance: [],
+    instructions: [
+      {
+        rule: 'Never book procedures without prior consultation',
+        status: 'violated',
+        detail: 'Agent booked liposuction directly without consultation screening.',
+      },
+      {
+        rule: 'Do not guarantee or promise results',
+        status: 'violated',
+        detail: 'Agent told the patient “You’ll love the results” — an explicit outcome promise.',
+      },
+      {
+        rule: 'Always mention potential risks for surgical procedures',
+        status: 'violated',
+        detail: 'Agent omitted every risk disclosure for a surgical procedure.',
+      },
+    ],
+    rootCause: {
+      label: 'Instruction conflict',
+      detail:
+        'Three configured rules were violated at once. The agent’s booking behaviour is overriding the consultation, results and risk-disclosure guardrails.',
+    },
+    fixSuggestion: {
+      action: 'Merge conflicting rules',
+      detail:
+        'Rule A “assist with booking” conflicts with Rule B “require consultation first”. Suggested merge: “For procedure booking requests, first schedule a consultation. Do not promise specific results. Always mention that all procedures carry potential risks.”',
+    },
+  },
+
   // ---------- Price ----------
   {
     id: 'p1',
     category: 'Price',
     question: 'What is the typical starting price for a Botox treatment at your clinic?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       "Botox starts at **$12 per unit**, with most first-time areas (forehead, frown lines, or crow's feet) using 20–30 units. Your injector will confirm an exact unit count and price during your consultation before treatment.",
     content: [{ kind: 'content', title: 'Botox pricing guide', meta: 'Help center · Article' }],
@@ -87,7 +184,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Price',
     question: 'Do you charge Botox by unit or by treatment area?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'We charge **per unit** rather than per area, since the number of units needed varies by patient. This keeps pricing precise to your anatomy instead of a flat per-zone fee.',
     content: [{ kind: 'content', title: 'Botox pricing guide', meta: 'Help center · Article' }],
@@ -98,7 +195,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Price',
     question: 'Are there package prices if I combine multiple treatments in one visit?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       "Yes — combining Botox with filler or a laser add-on qualifies for our **Multi-Treatment Bundle**, a 10% discount applied automatically at checkout when two or more services are booked same-day.",
     content: [{ kind: 'content', title: 'Bundled treatment pricing', meta: 'Help center · Article' }],
@@ -109,7 +206,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Price',
     question: 'Is there a deposit required to reserve an appointment?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'A **$50 deposit** is required to hold any injectable or laser appointment. It’s applied toward your treatment total and is refundable with 24 hours’ notice.',
     content: [{ kind: 'content', title: 'Booking & deposit policy', meta: 'Help center · Article' }],
@@ -120,7 +217,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Price',
     question: 'Can you provide a full quote before I decide to proceed?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       "Absolutely — during your consultation, your provider will map out the recommended units or sessions and give you a **written quote** with no obligation to book that day.",
     content: [{ kind: 'content', title: 'Consultation process', meta: 'Help center · Article' }],
@@ -133,7 +230,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Results',
     question: 'How soon will I see results after Botox?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       "You'll typically notice softening within **3–5 days**, with full results settling by **day 14**. That's why we recommend booking Botox at least two weeks before any big event.",
     content: [{ kind: 'content', title: 'Botox timeline & aftercare', meta: 'Help center · Article' }],
@@ -144,7 +241,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Results',
     question: 'How long do lip filler results usually last?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Lip filler typically lasts **6–12 months**, depending on the product used and your metabolism. Most patients return for a touch-up around the 9-month mark.',
     content: [{ kind: 'content', title: 'Dermal filler longevity', meta: 'Help center · Article' }],
@@ -155,7 +252,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Results',
     question: 'Will my face still move naturally after Botox?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — when dosed conservatively, Botox **softens** dynamic wrinkles rather than freezing the muscle entirely. We always start with a natural-movement dose and adjust at your follow-up if you want more effect.',
     content: [{ kind: 'content', title: 'Botox timeline & aftercare', meta: 'Help center · Article' }],
@@ -166,7 +263,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Results',
     question: 'What should I do if my results look uneven after treatment?',
     status: 'knowledge_gap',
-    rating: null,
+    review: null,
     answer:
       'If your results look uneven, please reach out and we’ll get you scheduled to have it looked at as soon as possible.',
     content: [],
@@ -182,7 +279,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Results',
     question: 'Are results from laser treatments permanent or will I need maintenance?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Laser hair removal results are **long-lasting but not always permanent** — most patients see 80–90% reduction after a full series, with occasional maintenance sessions once or twice a year.',
     content: [{ kind: 'content', title: 'Laser hair removal overview', meta: 'Help center · Article' }],
@@ -195,7 +292,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Health condition',
     question: 'I have an autoimmune condition. Can I still receive injectables?',
     status: 'knowledge_gap',
-    rating: null,
+    review: null,
     answer:
       'Many patients with autoimmune conditions do receive injectables safely, but it really depends on your specific diagnosis and medications.',
     content: [],
@@ -211,7 +308,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Health condition',
     question: "I'm diabetic. Are there any extra precautions for cosmetic procedures?",
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       "If your diabetes is well-managed, most treatments are safe. We'll ask about your recent blood sugar control and, for anything involving skin resurfacing, confirm you're not currently managing an active wound or infection.",
     content: [{ kind: 'content', title: 'Pre-treatment health screening', meta: 'Help center · Article' }],
@@ -222,7 +319,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Health condition',
     question: 'I have a history of keloid scarring. Is microneedling or laser safe for me?',
     status: 'knowledge_gap',
-    rating: null,
+    review: null,
     answer:
       "That's a great question to bring to your consultation — our provider can assess your scarring history in person.",
     content: [],
@@ -238,7 +335,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Health condition',
     question: 'I recently had surgery. How long should I wait before cosmetic treatment?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'We generally recommend waiting **4–6 weeks** after any surgery, and longer if you’re still on blood thinners or antibiotics. Your provider will confirm timing based on your procedure and recovery.',
     content: [{ kind: 'content', title: 'Pre-treatment health screening', meta: 'Help center · Article' }],
@@ -249,13 +346,11 @@ export const questionBank: TestQuestion[] = [
     category: 'Health condition',
     question: 'I have a history of allergic reactions. Do I need allergy testing first?',
     status: 'failure',
-    rating: null,
+    review: null,
     answer:
       "No need to worry about that — our injectables are hypoallergenic, so you can go ahead and book your treatment directly.",
     content: [],
-    guidance: [
-      { kind: 'guidance', title: 'Always require a patch test for patients with allergy history', meta: 'Guidance' },
-    ],
+    guidance: [],
     rootCause: {
       label: 'Instruction conflict',
       detail:
@@ -269,7 +364,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Treatment types',
     question: 'What treatments do you offer for forehead lines besides Botox?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Besides Botox, we offer **microneedling with radiofrequency** and **medical-grade skincare with retinoids** to soften forehead lines, especially for patients who prefer a non-injectable route.',
     content: [{ kind: 'content', title: 'Treatment menu — forehead & brow', meta: 'Help center · Article' }],
@@ -280,7 +375,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Treatment types',
     question: "What's the best option for volume loss in the cheeks?",
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'For cheek volume loss, **hyaluronic acid filler** is our most common recommendation, with **Sculptra** (a collagen-stimulating option) for patients wanting a gradual, longer-lasting build.',
     content: [{ kind: 'content', title: 'Treatment menu — cheeks & mid-face', meta: 'Help center · Article' }],
@@ -291,7 +386,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Treatment types',
     question: 'Do you offer treatments for jawline slimming or facial contouring?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — we offer **masseter Botox** for jawline slimming and **filler contouring** for definition along the jaw and chin. Your provider will recommend based on whether the fullness comes from muscle or fat.',
     content: [{ kind: 'content', title: 'Treatment menu — jaw & contouring', meta: 'Help center · Article' }],
@@ -302,7 +397,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Treatment types',
     question: 'What is the difference between a chemical peel and laser resurfacing?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'A **chemical peel** uses acids to exfoliate the top skin layers — great for texture and tone with minimal downtime. **Laser resurfacing** uses light energy to reach deeper layers, offering stronger results for scarring or deep wrinkles but with more recovery time.',
     content: [{ kind: 'content', title: 'Peels vs. laser resurfacing', meta: 'Help center · Article' }],
@@ -313,7 +408,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Treatment types',
     question: 'Do you offer microneedling with PRP or growth factors?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes, our **Microneedling + PRP** service uses your own blood-derived growth factors to boost collagen production and speed up healing — popular for acne scarring and overall skin quality.',
     content: [{ kind: 'content', title: 'Microneedling with PRP', meta: 'Help center · Article' }],
@@ -326,7 +421,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Clinic staff',
     question: 'Who will perform my injections during the appointment?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Your injections are performed by one of our **licensed injectors** — either a registered nurse or physician assistant working under our medical director’s supervision.',
     content: [{ kind: 'content', title: 'Meet our clinical team', meta: 'Help center · Article' }],
@@ -337,7 +432,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Clinic staff',
     question: 'Are treatments done by doctors, nurses, physician assistants, or aestheticians?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Injectables are performed by **RNs or PAs**; laser and skincare services are performed by **licensed aestheticians**. All treatment plans are reviewed by our **medical director**.',
     content: [{ kind: 'content', title: 'Meet our clinical team', meta: 'Help center · Article' }],
@@ -348,7 +443,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Clinic staff',
     question: 'What training does your injector team have?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Every injector completes **advanced injectable certification**, ongoing manufacturer training for the products we carry, and a supervised caseload before treating independently.',
     content: [{ kind: 'content', title: 'Meet our clinical team', meta: 'Help center · Article' }],
@@ -359,7 +454,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Clinic staff',
     question: 'Will a medical professional review my treatment plan before the procedure?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — every treatment plan is reviewed and signed off by your injector and, when required, our **medical director**, before your appointment is confirmed.',
     content: [{ kind: 'content', title: 'Consultation process', meta: 'Help center · Article' }],
@@ -370,7 +465,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Clinic staff',
     question: 'Can I meet the provider before committing to treatment?',
     status: 'knowledge_gap',
-    rating: null,
+    review: null,
     answer:
       'You can certainly ask about this when you book — I don’t have details on scheduling a separate meet-and-greet visit.',
     content: [],
@@ -388,7 +483,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Licensing & legal',
     question: 'Is your clinic medically supervised?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — our clinic operates under the supervision of a **licensed medical director** who oversees all treatment protocols and reviews clinical cases.',
     content: [{ kind: 'content', title: 'Clinic licensing & compliance', meta: 'Help center · Article' }],
@@ -399,7 +494,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Licensing & legal',
     question: 'Are you licensed to provide injectable treatments in this state?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       "Yes, we're fully licensed as a **medical aesthetics practice** in this state, and all injectors hold active state licensure in addition to their injectable certifications.",
     content: [{ kind: 'content', title: 'Clinic licensing & compliance', meta: 'Help center · Article' }],
@@ -410,7 +505,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Licensing & legal',
     question: 'Do you use FDA-approved products for injectables?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — we only use **FDA-approved** Botox, Dysport, and dermal filler brands, sourced directly from the manufacturer.',
     content: [{ kind: 'content', title: 'Clinic licensing & compliance', meta: 'Help center · Article' }],
@@ -421,7 +516,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Licensing & legal',
     question: 'Are consent forms required before treatment?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — you’ll review and sign a **procedure-specific consent form** covering risks, benefits, and alternatives before any injectable, laser, or peel treatment.',
     content: [{ kind: 'content', title: 'Consent & consultation requirements', meta: 'Help center · Article' }],
@@ -432,7 +527,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Licensing & legal',
     question: 'What safety protocols do you follow to meet medical compliance standards?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'We follow **state medical board protocols** for injectable administration, sterile technique, product handling, and adverse-event reporting, with regular compliance audits by our medical director.',
     content: [{ kind: 'content', title: 'Clinic licensing & compliance', meta: 'Help center · Article' }],
@@ -445,7 +540,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Refund policy',
     question: 'What is your refund policy if I change my mind before treatment?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'If you cancel **before** treatment begins, any deposit is refundable with 24 hours’ notice. Once a treatment is administered, it cannot be refunded since the product has been used.',
     content: [{ kind: 'content', title: 'Cancellation & refund policy', meta: 'Help center · Article' }],
@@ -456,7 +551,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Refund policy',
     question: 'Can I get my deposit back if I cancel in advance?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — deposits are fully refundable if you cancel or reschedule with at least **24 hours’ notice**. Cancellations inside that window forfeit the deposit.',
     content: [{ kind: 'content', title: 'Cancellation & refund policy', meta: 'Help center · Article' }],
@@ -467,11 +562,11 @@ export const questionBank: TestQuestion[] = [
     category: 'Refund policy',
     question: "What happens if I'm not satisfied with my results?",
     status: 'failure',
-    rating: null,
+    review: null,
     answer:
       "Don't worry — if you're not happy with the results, we'll issue a full refund for the treatment, no questions asked.",
     content: [],
-    guidance: [{ kind: 'guidance', title: 'Do not promise refunds for subjective dissatisfaction', meta: 'Guidance' }],
+    guidance: [],
     rootCause: {
       label: 'Instruction conflict',
       detail:
@@ -483,7 +578,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Refund policy',
     question: 'Do you provide refunds for allergic reactions or medical ineligibility?',
     status: 'knowledge_gap',
-    rating: null,
+    review: null,
     answer:
       'If something like that comes up, reach out to our team and we’ll figure out the right next step for you.',
     content: [],
@@ -499,7 +594,7 @@ export const questionBank: TestQuestion[] = [
     category: 'Refund policy',
     question: 'If the provider advises against treatment, do I still pay the appointment fee?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'No — if your provider determines you’re not a candidate during the consultation, your **consultation fee is waived** and any deposit is fully refunded.',
     content: [{ kind: 'content', title: 'Cancellation & refund policy', meta: 'Help center · Article' }],
@@ -512,7 +607,7 @@ export const questionBank: TestQuestion[] = [
     category: 'First consultation',
     question: 'Can I come in just to discuss options without getting treatment that day?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Of course — consultations are **no-obligation**. Many patients come in just to talk through options and decide later, sometimes weeks or months after.',
     content: [{ kind: 'content', title: 'Consultation process', meta: 'Help center · Article' }],
@@ -523,7 +618,7 @@ export const questionBank: TestQuestion[] = [
     category: 'First consultation',
     question: 'How should I prepare for my first consultation?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Come with a list of your goals or concerns, any medications or supplements you take, and avoid blood thinners like aspirin or fish oil for a few days if you’re considering injectables.',
     content: [{ kind: 'content', title: 'Preparing for your visit', meta: 'Help center · Article' }],
@@ -534,7 +629,7 @@ export const questionBank: TestQuestion[] = [
     category: 'First consultation',
     question: 'Can I bring inspiration photos to show the look I want?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Definitely — inspiration photos help your provider understand your goals, and we’ll talk through what’s realistically achievable for your anatomy.',
     content: [{ kind: 'content', title: 'Consultation process', meta: 'Help center · Article' }],
@@ -545,7 +640,7 @@ export const questionBank: TestQuestion[] = [
     category: 'First consultation',
     question: 'Will the consultation include a facial assessment?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Yes — your provider will do a hands-on **facial assessment**, looking at skin quality, symmetry, and movement patterns to build a personalized plan.',
     content: [{ kind: 'content', title: 'Consultation process', meta: 'Help center · Article' }],
@@ -556,7 +651,7 @@ export const questionBank: TestQuestion[] = [
     category: 'First consultation',
     question: 'What should I expect after the consultation if I decide not to book treatment immediately?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'No pressure at all — you’ll leave with your written treatment plan and quote, and can book whenever you’re ready. We’ll follow up once, then leave it to you.',
     content: [{ kind: 'content', title: 'Consultation process', meta: 'Help center · Article' }],
@@ -569,7 +664,7 @@ export const questionBank: TestQuestion[] = [
     category: 'New customers',
     question: "I'm new to your clinic. How do I book my first consultation?",
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Welcome! 👋 You can book your first consultation directly through our online scheduler, or reply here with a few times that work and we’ll get you on the calendar.',
     content: [{ kind: 'content', title: 'Booking your first visit', meta: 'Help center · Article' }],
@@ -580,7 +675,7 @@ export const questionBank: TestQuestion[] = [
     category: 'New customers',
     question: "I've never had injectables before. Where should I start?",
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'A great place to start is a **consultation with no obligation to treat that day**. Most first-timers start with a conservative Botox dose or a small amount of filler to see how they like the result.',
     content: [{ kind: 'content', title: 'First-timer guide', meta: 'Help center · Article' }],
@@ -591,7 +686,7 @@ export const questionBank: TestQuestion[] = [
     category: 'New customers',
     question: 'Do you offer virtual consultations for new clients?',
     status: 'knowledge_gap',
-    rating: null,
+    review: null,
     answer:
       "I'm not sure whether virtual consultations are offered right now — I'd suggest checking with the front desk directly.",
     content: [],
@@ -607,7 +702,7 @@ export const questionBank: TestQuestion[] = [
     category: 'New customers',
     question: "I'm nervous about looking unnatural. Can you do subtle results?",
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Completely understandable, and very common! We specialize in **natural, subtle results** — we always start conservative and can always add more at a follow-up if you want.',
     content: [{ kind: 'content', title: 'Our approach to natural results', meta: 'Help center · Article' }],
@@ -618,7 +713,7 @@ export const questionBank: TestQuestion[] = [
     category: 'New customers',
     question: 'Do you have availability this week for a first-time consultation?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'We usually have a few consultation slots open each week — share your preferred days and I can point you to our live scheduler to grab one before it fills up.',
     content: [{ kind: 'content', title: 'Booking your first visit', meta: 'Help center · Article' }],
@@ -631,7 +726,7 @@ export const questionBank: TestQuestion[] = [
     category: 'General',
     question: 'Is Botox painful, and do you use numbing cream?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Most patients describe it as a quick pinch rather than pain. We offer **topical numbing cream** on request, and the injections themselves take only a few minutes.',
     content: [{ kind: 'content', title: 'What to expect during treatment', meta: 'Help center · Article' }],
@@ -642,52 +737,18 @@ export const questionBank: TestQuestion[] = [
     category: 'General',
     question: 'I have a wedding in two weeks. Is it too late to get Botox or fillers?',
     status: 'pass',
-    rating: null,
+    review: null,
     answer:
       'Two weeks is cutting it close for Botox (full results take up to 14 days) but still workable. Filler shows results almost immediately, so that’s a safer bet this close to your date — let’s get you in soon!',
     content: [{ kind: 'content', title: 'Botox timeline & aftercare', meta: 'Help center · Article' }],
     guidance: [],
   },
   {
-    id: 'g3',
-    category: 'General',
-    question: "I'm taking blood thinners. Can I still get liposuction or any injectable treatments?",
-    status: 'knowledge_gap',
-    rating: null,
-    answer:
-      'That’s worth discussing with your provider — blood thinners can affect bruising and healing, so we’ll want to look at your specific medication.',
-    content: [],
-    guidance: [],
-    rootCause: {
-      label: 'Knowledge gap',
-      detail:
-        'No medication-contraindication article exists for anticoagulants and liposuction/injectables eligibility. Search returned 0 results from 142 documents for "blood thinners contraindication."',
-    },
-  },
-  {
-    id: 'g4',
-    category: 'General',
-    question: 'Can I book liposuction directly, or do I need a consultation first?',
-    status: 'failure',
-    rating: null,
-    answer:
-      'Great! I’ve gone ahead and booked your liposuction appointment for the next available slot — you’re all set!',
-    content: [],
-    guidance: [
-      { kind: 'guidance', title: 'Never book procedures without a prior consultation', meta: 'Guidance' },
-    ],
-    rootCause: {
-      label: 'Instruction conflict',
-      detail:
-        'Rule "Never book procedures without a prior consultation" was violated — the agent booked liposuction directly instead of routing to a consultation first.',
-    },
-  },
-  {
     id: 'g5',
     category: 'General',
     question: "I'm pregnant or breastfeeding. Which treatments should I avoid?",
     status: 'knowledge_gap',
-    rating: null,
+    review: null,
     answer:
       'Great question to flag — safety during pregnancy and breastfeeding varies by treatment, so I’d recommend confirming specifics with your provider before booking anything.',
     content: [],

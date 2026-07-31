@@ -5,7 +5,7 @@ import FinSidebar from './components/FinSidebar';
 import TestConsole from './components/TestConsole';
 import EvaluatePanel from './components/EvaluatePanel';
 import { GenerateQuestionsModal, AddManuallyModal, ComingSoonModal } from './components/AddQuestionModals';
-import { testGroup as initialGroup, type TestQuestion } from './data';
+import { testGroup as initialGroup, type ReviewVerdict, type TestQuestion } from './data';
 
 type AddAction = 'manual' | 'generate' | 'csv' | 'inbox';
 
@@ -40,12 +40,17 @@ export default function App() {
         category: 'General',
         question: text,
         status: null,
-        rating: null,
+        review: null,
         answer: '',
         content: [],
         guidance: [],
       },
     ]);
+  };
+
+  /** Reviews live here, not in the panel, so they survive switching questions. */
+  const handleReview = (id: string, review: ReviewVerdict) => {
+    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, review } : q)));
   };
 
   const handleRunEvaluation = () => {
@@ -74,8 +79,13 @@ export default function App() {
               running={running}
               onRunEvaluation={handleRunEvaluation}
             />
-            {/* key resets per-question local state (rating, expanded sources) */}
-            <EvaluatePanel key={selected?.id ?? 'none'} question={selected} evaluated={evaluated} />
+            {/* key resets per-question local state (expanded sources) */}
+            <EvaluatePanel
+              key={selected?.id ?? 'none'}
+              question={selected}
+              evaluated={evaluated}
+              onReview={handleReview}
+            />
           </div>
         </main>
       </div>

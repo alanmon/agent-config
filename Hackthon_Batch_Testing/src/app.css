@@ -567,53 +567,34 @@ body {
   padding: 2px 0 0;
 }
 
-/* ---------- Rate section ---------- */
-.rate-section {
+/* ---------- Review bar ----------
+   Echoes the system's verdict and asks the reviewer to confirm or dispute it,
+   rather than asking them to grade the answer a second time. */
+.review-section {
   border-top: 1px solid var(--line);
-  padding: 16px 18px 18px;
+  padding: 12px 18px 14px;
 }
-.rate-title {
-  font-size: 15px;
-  font-weight: 700;
+.review-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.rate-desc {
-  color: var(--text-muted);
+.review-label {
   font-size: 13px;
-  line-height: 1.45;
-  margin: 6px 0 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
-.rate-buttons {
+.review-buttons {
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
-.rate-button-slot {
-  flex: 1 1 0;
-  min-width: 0;
+.review-button::part(base) {
+  width: auto;
 }
-.rate-button,
-.rate-button::part(base) {
-  width: 100%;
-}
-.rate-btn-inner {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 5px;
-  background: var(--active-bg);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-.rate-note {
-  margin-top: 14px;
+.review-note {
+  margin-top: 10px;
 }
 
 /* ---------- Evaluate panel: waiting / empty ---------- */
@@ -657,6 +638,119 @@ body {
 .root-cause-error {
   background: var(--ks-color-error-surface2, #fde6e6);
   border-color: var(--ks-color-error-surface3, #f7c2c2);
+}
+
+/* ---------- Inspector section headings ---------- */
+.section-label {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 20px 0 10px;
+}
+
+/* ---------- Instructions: rule-by-rule traceability ---------- */
+.instr-section {
+  margin-bottom: 4px;
+}
+.instr-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.instr-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  margin-top: 1px;
+}
+.instr-body {
+  min-width: 0;
+}
+.instr-rule {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.4;
+}
+.instr-detail {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.instr-followed .instr-icon {
+  color: var(--ks-color-success-fill, #1c8a3b);
+}
+/* Violated rules carry the tint — this is the "three red crosses" moment. */
+.instr-violated {
+  background: var(--ks-color-error-surface2, #fde6e6);
+  border-color: var(--ks-color-error-surface3, #f7c2c2);
+}
+.instr-violated .instr-icon {
+  color: var(--ks-color-error-fill, #c92a2a);
+}
+
+/* Retrieval evidence, shown in place of a bare "nothing found". */
+.uses-evidence {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ks-color-warning-fill, #b06a00);
+  background: var(--ks-color-warning-surface2, #fdf1de);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 10px;
+}
+
+/* ---------- Fix suggestion ---------- */
+.fix-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 20px;
+  background: var(--page-bg);
+}
+.fix-card-warning {
+  border-color: var(--ks-color-warning-surface3, #f8dfb0);
+}
+.fix-card-error {
+  border-color: var(--ks-color-error-surface3, #f7c2c2);
+}
+.fix-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.fix-head-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.fix-cause {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-strong);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed var(--line);
+}
+.fix-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.fix-detail {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-top: 6px;
 }
 
 /* ---------- Generate questions modal ---------- */
