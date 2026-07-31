@@ -19,101 +19,100 @@ A **Test Console + Root Cause Inspector** for an Agent Configuration Platform. U
 
 ## Tech stack
 
-- **Plain HTML / CSS / vanilla JS.** No build step, no framework, no npm install.
-- Data lives in static JSON files loaded at runtime.
-- Everything must run by opening `index.html` in a browser (or a trivial `python3 -m http.server`).
+- **React 18 + TypeScript + Vite**, living in `Hackthon_Batch_Testing/`.
+- UI components come from the Keystone design system (`@byted-keystone/react`, `@fe-infra/keystone-icons-react`). Prefer a Keystone component over a hand-rolled one.
+- Styling is plain CSS in a single `src/app.css` — no CSS-in-JS, no Tailwind.
+- Data is mock data in `src/data.ts`, typed and imported at build time. No JSON fetching, no network calls.
 
-**Do not introduce React, Vite, TypeScript, Tailwind, or any bundler.** We picked this for merge simplicity and it is locked. If you think you need a library, ask the team first.
+Run it with:
+
+```bash
+cd Hackthon_Batch_Testing && npm install && npm run dev
+```
+
+Dev server is on port 5173. `npm run build` typechecks (`tsc --noEmit`) then builds.
+
+**Do not add another framework, state library, CSS framework, or bundler** on top of this. If you think you need a library, ask the team first.
 
 ---
 
 ## Project structure
 
 ```
-/index.html          — app shell, owned by R4 (integrator)
-/css/styles.css      — shared styles
-/js/console.js       — Test Console panel (R1 only)
-/js/inspector.js     — Root Cause Inspector panel (R2 only)
-/js/app.js           — wiring, state, Run Test animation (R4 only)
-/data/scenario1.json — mostly passing baseline (R3 only)
-/data/scenario2.json — knowledge gap (R3 only)
-/data/scenario3.json — instruction conflict (R3 only)
-/demo/script.md      — 2-min recording script (R3 only)
+Hackthon_Batch_Testing/
+  index.html                        — Vite entry
+  vite.config.ts / tsconfig.json    — build config
+  src/main.tsx                      — React root
+  src/App.tsx                       — state, wiring, modal + evaluation flow
+  src/app.css                       — all styles
+  src/data.ts                       — types + mock question bank
+  src/components/
+    TopBar.tsx                      — agent name / version header
+    IconRail.tsx, FinSidebar.tsx    — left navigation chrome
+    TestConsole.tsx                 — question list, filters, run evaluation
+    EvaluatePanel.tsx               — Root Cause Inspector (right panel)
+    AddQuestionModals.tsx           — generate / add-manually / coming-soon modals
 ```
 
-**File ownership is strict.** Stay in your file. If you need something changed in someone else's file, message them — don't edit it.
+`node_modules/` and `dist/` are gitignored — do not commit build output.
 
 ---
 
 ## The data contract (DO NOT CHANGE WITHOUT TEAM AGREEMENT)
 
-Every scenario JSON must match this shape exactly. UI code should read only these fields.
+The contract is the TypeScript types in `src/data.ts` — they are the source of truth, not this file. Current shape:
 
-```json
-{
-  "scenario_id": "instruction_conflict",
-  "agent": {
-    "name": "Med-Spa Consultation Agent",
-    "version": "v2 — Draft"
-  },
-  "summary": {
-    "total": 6,
-    "passed": 4,
-    "knowledge_gap": 1,
-    "instruction_conflict": 1,
-    "tool_error": 0
-  },
-  "questions": [
-    {
-      "id": "q5",
-      "question": "I want to book a liposuction appointment for next Tuesday. My friend got it done and looked amazing!",
-      "status": "failed",
-      "root_cause_category": "instruction_conflict",
-      "answer": "Great! I've booked your liposuction appointment for Tuesday at 2 PM. You'll love the results — liposuction is one of our most popular procedures!",
-      "instructions": [
-        {
-          "rule": "Never book procedures without prior consultation",
-          "status": "violated",
-          "detail": "Agent booked liposuction directly without consultation screening"
-        }
-      ],
-      "sources": [],
-      "fix_suggestion": {
-        "action": "Merge conflicting rules",
-        "detail": "Rule A 'assist with booking' conflicts with Rule B 'require consultation first'. Suggested merge: 'For procedure booking requests, first schedule a consultation. Do not promise specific results. Always mention that all procedures carry potential risks.'"
-      }
-    }
-  ]
+```ts
+type EvalStatus = 'pass' | 'knowledge_gap' | 'failure';
+type ReviewVerdict = 'agree' | 'disagree';
+
+interface TestQuestion {
+  id: string;
+  category: Category;          // one of CATEGORIES in data.ts
+  question: string;
+  status: EvalStatus | null;   // null until "Run evaluation"
+  review: ReviewVerdict | null;// null until the reviewer weighs in
+  answer: string;              // supports **bold** and emoji
+  content: AnswerSource[];     // "Content (n)" group
+  guidance: AnswerSource[];    // "Guidance (n)" group — cited rules only
+  rootCause?: RootCause;       // present for knowledge_gap / failure
+  instructions?: InstructionTrace[]; // rule-by-rule trace; section hidden when absent
+  fixSuggestion?: FixSuggestion;     // section hidden when absent
+  searchEvidence?: string;     // shown in Sources when nothing was retrieved
 }
+
+interface AnswerSource   { kind: 'content' | 'guidance'; title: string; meta: string }
+interface RootCause      { label: string; detail: string }
+interface InstructionTrace { rule: string; status: 'followed' | 'violated'; detail: string }
+interface FixSuggestion  { action: string; detail: string }
 ```
 
 **Field rules:**
-- `status` is `"passed"` or `"failed"` only.
-- `root_cause_category` is `"knowledge_gap"`, `"instruction_conflict"`, `"tool_error"`, or `null` for passing questions.
-- `instructions[].status` is `"followed"` or `"violated"` only.
-- `sources` is an array of strings (filenames/article refs). Empty array means "none found" — the Inspector renders search evidence text in that case.
-- `fix_suggestion` is `null` for passing questions.
+- `status` is `'pass' | 'knowledge_gap' | 'failure'`, or `null` before evaluation runs.
+- `instructions[].status` is `'followed'` or `'violated'` only.
+- Optional fields (`rootCause`, `instructions`, `fixSuggestion`) are authored only for the story scenarios; the Inspector hides those sections when absent.
+- Empty `content` / `guidance` means nothing was retrieved — the Inspector falls back to `searchEvidence`.
 
 ---
 
 ## UI layout
 
-- **Top bar:** agent name + version label + "Run Test" button
-- **Summary strip:** 4 metric badges — Pass Rate (green), Knowledge Gap (orange), Instruction Conflict (red), Tool Error (purple), each with a count
-- **Left panel (Test Console):** filter tabs (All / Passed / Failed) + scrollable question list. Each row = question text, status icon (green check / red cross / orange warning), root cause category tag
-- **Right panel (Root Cause Inspector):** 4 collapsible sections —
-  1. **Answer** — agent response with streaming text effect
+- **Left chrome:** `IconRail` + `FinSidebar` navigation.
+- **Top bar:** agent name + version label.
+- **Summary strip:** appears once evaluation has run — three chips: Pass (green), Knowledge gap (orange), Failure (red), each with a count.
+- **Left panel (Test Console):** question table (checkbox / Question / Answer status / Result), an "Add questions" dropdown, and the **Run evaluation** button.
+- **Right panel (Root Cause Inspector):** sections rendered per question —
+  1. **Answer** — agent response
   2. **Instructions** — each rule with green check (followed) or red cross (violated) + why
-  3. **Sources** — cited documents, or "none found" with search evidence
-  4. **Fix Suggestion** — root cause badge + recommended action + "Apply Fix" button
+  3. **Sources** — Content / Guidance groups, or search evidence when nothing was retrieved
+  4. **Fix Suggestion** — root cause label + recommended action
 
 **Color semantics (use consistently everywhere):**
 | Meaning | Color |
 |---|---|
-| Passed / rule followed | green |
+| Pass / rule followed | green |
 | Knowledge gap | orange |
-| Instruction conflict / rule violated | red |
-| Tool error | purple |
+| Failure / rule violated | red |
 
 ---
 
@@ -121,23 +120,22 @@ Every scenario JSON must match this shape exactly. UI code should read only thes
 
 | Role | Owns | Files |
 |---|---|---|
-| **R1 — Test Console** | Summary badges, filter tabs, question list w/ status icons + root cause tags, Run Test button | `js/console.js` |
-| **R2 — Inspector** | 4 collapsible sections, streaming text effect, check/cross rendering, fix suggestion card | `js/inspector.js` |
-| **R3 — Data & Demo** | All 3 scenario JSONs (6 questions each), demo script, dry runs | `data/*.json`, `demo/script.md` |
-| **R4 — Integrator** | App shell, state wiring, click-to-inspect flow, Run Test animation, bug fixes | `index.html`, `js/app.js` |
-| **R5 — QA & Polish** | Cross-browser check, visual consistency pass, recording setup, backup demo device, standby for fixes | `css/styles.css` (coordinate w/ R1+R2) |
+| **R1 — Test Console** | Filter tabs, question list w/ status icons + root cause tags, run evaluation | `src/components/TestConsole.tsx` |
+| **R2 — Inspector** | Collapsible sections, check/cross rendering, fix suggestion card | `src/components/EvaluatePanel.tsx` |
+| **R3 — Data & Demo** | Question bank + scenario authoring, demo script, dry runs | `src/data.ts` |
+| **R4 — Integrator** | App shell, state wiring, click-to-inspect flow, modals, bug fixes | `src/App.tsx`, `src/components/AddQuestionModals.tsx` |
+| **R5 — QA & Polish** | Cross-browser check, visual consistency pass, recording setup, backup demo device | `src/app.css` (coordinate w/ R1+R2) |
 
-**Note:** the original plan defined 4 roles. R5 above is the suggested fifth — QA, polish, and demo insurance. Adjust in the first 10 minutes if the team prefers pairing R5 with R1 or R2 instead.
+**Note:** `src/app.css` is shared by every panel, so coordinate before large edits there.
 
 ---
 
 ## Conventions
 
-- Vanilla JS, ES modules. Each panel file exports a `render(container, data)` and an `update(data)` function — R4 calls these; nobody else does.
-- No global mutable state outside `js/app.js`. Panels receive data as arguments.
+- Panels are presentational React components taking props. App-level state lives in `src/App.tsx`; panels don't own it.
 - Commit messages: short, present tense ("add summary badges", not "added summary badges").
 - Branch naming: `r1/console`, `r2/inspector`, `r3/data`, `r4/shell`, `r5/polish`.
-- CSS: use CSS custom properties for the 4 status colors, defined once in `styles.css`. Never hardcode hex values in JS.
+- CSS: use CSS custom properties for the status colors, defined once in `src/app.css`. Never hardcode hex values in TSX.
 
 ---
 
@@ -147,7 +145,8 @@ Every scenario JSON must match this shape exactly. UI code should read only thes
 - Do not change the data contract unilaterally.
 - Do not edit another role's file.
 - Do not push directly to `main` — push your branch, R4 merges.
-- Do not add a build step, package manager, or framework.
+- Do not commit `node_modules/` or `dist/` — both are gitignored.
+- Do not add another framework, state library, or bundler.
 - Do not add features not in the demo script. Polish what's in the script instead.
 
 ---
