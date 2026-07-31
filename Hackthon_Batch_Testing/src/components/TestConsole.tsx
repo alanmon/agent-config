@@ -98,7 +98,7 @@ export default function TestConsole({
             </KsButton>
             <KsDropdownButton variant="default" size="md" options={addQuestionsOptions(onAddAction)}>
               <span className="chip-inner">
-                <KsIconPlus size="16" /> Add questions <KsIconChevronDown size="14" />
+                <KsIconPlus size="16" /> Add questions
               </span>
             </KsDropdownButton>
             <KsButton

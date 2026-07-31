@@ -33,10 +33,12 @@ export default function App() {
     setModal(null);
   };
 
-  const handleAddManual = (text: string) => {
-    addQuestions([
-      {
-        id: `manual-${Date.now()}`,
+  const handleAddManual = (texts: string[]) => {
+    const stamp = Date.now();
+    addQuestions(
+      texts.map((text, i) => ({
+        // index keeps ids unique when several are added in the same millisecond
+        id: `manual-${stamp}-${i}`,
         category: 'General',
         question: text,
         status: null,
@@ -44,8 +46,8 @@ export default function App() {
         answer: '',
         content: [],
         guidance: [],
-      },
-    ]);
+      })),
+    );
   };
 
   /** Reviews live here, not in the panel, so they survive switching questions. */
