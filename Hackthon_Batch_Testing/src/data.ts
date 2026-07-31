@@ -762,8 +762,8 @@ export const questionBank: TestQuestion[] = [
 ];
 
 export const testGroup: TestGroup = {
-  title: 'Med-Spa Consultation Agent',
-  updatedLabel: 'Updated a few seconds ago by',
-  updatedBy: 'Alex Smith',
+  title: 'Aura Med Spa Clinic agent',
+  updatedLabel: 'Updated 5s ago by',
+  updatedBy: 'C&S',
   questions: [],
 };

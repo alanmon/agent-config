@@ -142,7 +142,7 @@ export default function EvaluatePanel({ question, evaluated, onClose, onReview }
           autoCenter
           size="sm"
           title="No question selected"
-          description="Add a question and select it from the list to see its diagnosis here."
+          description="Select a question to see how your agent responds, and its diagnosis."
         />
       ) : !showResult ? (
         <div className="eval-body">

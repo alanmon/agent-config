@@ -101,8 +101,8 @@ export default function App() {
       <AddManuallyModal open={modal === 'manual'} onCancel={() => setModal(null)} onConfirm={handleAddManual} />
       <ComingSoonModal
         open={modal === 'csv'}
-        title="Import from a .csv"
-        description="CSV import isn't wired up in this prototype yet — use Generate questions or Add manually for now."
+        title="Import questions from CSV file"
+        description={<span>CSV upload isn't available in this demo. Use <b>Add manually</b> or <b>Auto-generate</b> to test your agent instead.</span>}
         onCancel={() => setModal(null)}
       />
       <ComingSoonModal

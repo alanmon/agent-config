@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { KsModal, KsCheckbox, KsInput, KsButton } from '@byted-keystone/react';
 import { KsIconDelete, KsIconPlus } from '@fe-infra/keystone-icons-react';
 import { CATEGORIES, questionBank, type TestQuestion } from '../data';
@@ -53,8 +53,8 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
   return (
     <KsModal
       open={open}
-      title="Generate questions"
-      description="Generated from your knowledge base and connected docs. Select the ones you want to add to this test."
+      title="Auto-generate questions"
+      description="These questions are generated from your sources and knowledge base. Select the ones you want to test."
       size="lg"
       width={640}
       confirmable
@@ -179,7 +179,7 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
     <KsModal
       open={open}
       title="Add questions manually"
-      description="Write the exact questions you want to test against the agent. Press Enter to start another."
+      description="Enter customer questions to see how your agent responds. Press Enter to start another."
       size="md"
       confirmable
       cancelable
@@ -248,7 +248,7 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
 interface ComingSoonProps {
   open: boolean;
   title: string;
-  description: string;
+  description: ReactNode;
   onCancel: () => void;
 }
 

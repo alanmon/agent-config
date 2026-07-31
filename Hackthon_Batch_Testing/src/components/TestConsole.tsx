@@ -110,7 +110,7 @@ export default function TestConsole({
             >
               <span className="chip-inner">
                 <KsIconPlayCircle size="16" />
-                {running ? 'Running…' : 'Run evaluation'}
+                {running ? 'Running…' : 'Run test'}
               </span>
             </KsButton>
           </div>
@@ -121,8 +121,8 @@ export default function TestConsole({
       {group.questions.length === 0 ? (
         <KsEmptyState
           autoCenter
-          title="No test questions yet"
-          description="Add questions to start testing how your agent responds — write your own, generate them from your knowledge base, or import a list."
+          title="No test questions added"
+          description="Add test questions to check for conflicting rules and knowledge gaps."
           footer={
             <div className="empty-actions">
               <KsButton variant="primary" size="md" onClick={() => onAddAction('manual')}>
@@ -132,12 +132,12 @@ export default function TestConsole({
               </KsButton>
               <KsButton variant="default" size="md" onClick={() => onAddAction('generate')}>
                 <span className="chip-inner">
-                  <KsIconWand size="16" /> Generate questions
+                  <KsIconWand size="16" /> Auto-generate
                 </span>
               </KsButton>
               <KsButton variant="default" size="md" onClick={() => onAddAction('csv')}>
                 <span className="chip-inner">
-                  <KsIconColoredExcel size="16" /> Import from a .csv
+                  <KsIconColoredExcel size="16" /> Import CSV
                 </span>
               </KsButton>
             </div>
