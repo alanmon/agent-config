@@ -5,14 +5,16 @@
 
 :root {
   --line: var(--ks-color-neutral-surface3, #ececed);
-  --page-bg: var(--ks-color-neutral-surface1, #f8f8f9);
+  --page-bg: var(--ks-color-neutral-surface2, #f2f3f3);
   --card-bg: var(--ks-color-neutral-surface, #ffffff);
   --hover-bg: var(--ks-color-neutral-surface1, #f8f8f9);
   --active-bg: var(--ks-color-neutral-surface2, #f2f3f3);
-  --text-strong: var(--ks-color-neutral-high, #161823);
+  --text-strong: var(--ks-color-neutral-fillHigh, #262627);
   --text-muted: var(--ks-color-neutral-fill, #87898b);
   --ink: #161823;
-  --radius-card: var(--ks-border-radius-lg, 8px);
+  /* Figma: workspace cards use a 14px radius, the side-nav card 8px. */
+  --radius-card: 14px;
+  --radius-nav: var(--ks-border-radius-lg, 8px);
   --radius-md: var(--ks-border-radius-md, 4px);
   --radius-sm: var(--ks-border-radius-md, 4px);
 }
@@ -181,12 +183,25 @@ body {
   padding: 16px 16px 16px 16px;
 }
 
+.shell-content.is-dashboard {
+  display: block;
+  overflow-y: auto;
+  padding: 24px 32px 32px;
+}
+
+/* ---------- Global nav (rail + expanding flyout) ---------- */
+.global-nav {
+  position: relative;
+  flex: 0 0 60px;
+  z-index: 30;
+}
+
 /* ---------- Far-left icon rail ---------- */
 .icon-rail {
-  flex: 0 0 60px;
+  height: 100%;
   width: 60px;
   background: var(--card-bg);
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--ks-color-neutral-fillLow, #d3d4d5);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -200,30 +215,362 @@ body {
   height: 40px;
 }
 
-/* ---------- Brand hub navigation ---------- */
-.brand-sidebar {
-  flex: 0 0 240px;
+/* ---------- Expanded nav flyout (screen 2) ---------- */
+.nav-flyout {
+  position: absolute;
+  inset: 0 auto 0 0;
   width: 240px;
-  height: 340px;
   background: var(--card-bg);
-  border-radius: var(--radius-card);
+  border-right: 1px solid var(--ks-color-neutral-fillLow, #d3d4d5);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-8px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+  overflow-y: auto;
+  padding: 16px 8px;
+}
+.nav-flyout.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+.nav-flyout-panel {
+  width: 100%;
+  background: transparent;
+}
+
+/* ---------- Lead agent hub navigation ---------- */
+.agent-sidebar {
+  flex: 0 0 200px;
+  width: 200px;
+  background: var(--card-bg);
+  border-radius: var(--radius-nav);
   overflow: hidden;
 }
-.brand-nav-label {
-  width: 100%;
+
+/* ============================================================
+   Screen 1 — Ads Manager dashboard
+   ============================================================ */
+.dashboard {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+.surface {
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.dash-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
 }
-.new-badge {
+.dash-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.dash-title-actions {
+  display: flex;
+  gap: 8px;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.section-title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.section-head .section-title {
+  margin: 0;
+}
+
+/* ---------- Recommendation cards ---------- */
+.rec-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.rec-card {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+}
+.rec-score {
+  flex: 0 0 76px;
+  padding-top: 2px;
+}
+.rec-score-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.rec-art {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+}
+.rec-body {
+  min-width: 0;
+}
+.rec-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.rec-desc {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ---------- Two-column body ---------- */
+.dash-columns {
+  display: grid;
+  grid-template-columns: 400px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.dash-col-left .section-title:not(:first-child) {
+  margin-top: 28px;
+}
+
+.balance-card,
+.status-card {
+  padding: 20px 22px;
+}
+.balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.balance-label {
   display: inline-flex;
   align-items: center;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--ks-border-radius-md, 4px);
-  background: var(--ks-color-support-surface2, #e9e7ff);
-  color: var(--ks-color-support-fill, #6557e8);
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.balance-value {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.balance-value .unit,
+.metric-value .unit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.soft-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 20px 0;
+}
+.inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+  cursor: pointer;
+}
+.inline-link:hover {
+  color: var(--ks-color-primary-fill, #009995);
+}
+
+.status-card {
+  padding: 4px 22px;
+}
+.status-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 0;
+}
+.status-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.row-divider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+}
+
+/* ---------- Performance ---------- */
+.perf-card {
+  padding: 16px 20px 20px;
+}
+.perf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.date-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-strong);
+  cursor: pointer;
+}
+.date-field:hover {
+  border-color: var(--ks-color-neutral-fill, #87898b);
+}
+.date-field .tz {
+  color: var(--text-muted);
+}
+.perf-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.metric-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.metric-tile {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.metric-tile:hover {
+  border-color: var(--ks-color-neutral-fill, #87898b);
+}
+.metric-tile.is-on {
+  border-color: var(--ks-color-primary-fill, #009995);
+  box-shadow: inset 0 0 0 1px var(--ks-color-primary-fill, #009995);
+}
+.metric-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.metric-label {
+  font-size: 13px;
+}
+.metric-label .optional {
+  color: var(--text-muted);
+}
+.metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
   font-size: 12px;
+  font-weight: 500;
+}
+.delta.up {
+  color: var(--ks-color-success-fill, #22a06b);
+}
+.delta.down {
+  color: var(--ks-color-error-fill, #e02f47);
+}
+
+.chart-column {
+  min-width: 0;
+}
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.chart-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+.chart-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.trend-chart svg {
+  display: block;
+  width: 100%;
+  height: 300px;
+}
+.trend-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.perf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 12px;
+}
+.perf-table th,
+.perf-table td {
+  padding: 8px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.perf-table th:first-child,
+.perf-table td:first-child {
+  text-align: left;
+  font-weight: 600;
+}
+.perf-table th {
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -250,8 +597,8 @@ body {
   min-width: 0;
 }
 .evaluate {
-  flex: 0 0 408px;
-  width: 408px;
+  flex: 0 0 432px;
+  width: 432px;
 }
 
 /* ---------- Console header ---------- */
@@ -310,10 +657,8 @@ body {
   font-size: 14px;
 }
 .filter-sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--line);
-  margin: 2px 0;
+  height: 20px;
+  flex: 0 0 auto;
 }
 .chip-inner {
   display: inline-flex;
@@ -325,12 +670,12 @@ body {
 .q-count {
   padding: 4px 20px 10px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
 }
 .q-head,
 .q-row {
   display: grid;
-  grid-template-columns: 30px 152px 132px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr) 132px 132px;
   gap: 12px;
   align-items: center;
   padding: 0 20px;
@@ -360,9 +705,8 @@ body {
   background: var(--hover-bg);
 }
 .q-row.is-selected {
-  background: var(--hover-bg);
+  background: var(--ks-color-neutral-surface1, #f8f8f9);
   box-shadow: inset 0 0 0 1px var(--line);
-  border-radius: var(--radius-sm);
 }
 .q-check {
   display: inline-flex;
@@ -425,7 +769,7 @@ body {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
 }
 .fin-mark {
@@ -471,7 +815,7 @@ body {
   justify-content: space-between;
 }
 .uses-row-title {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
 }
 .uses-chevron {
@@ -529,15 +873,11 @@ body {
 }
 .rate-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
-.rate-button-slot {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.rate-button,
 .rate-button::part(base) {
-  width: 100%;
+  border-radius: 8px;
 }
 .rate-btn-inner {
   display: inline-flex;

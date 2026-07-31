@@ -1,4 +1,4 @@
-import { useState, Fragment, type ReactNode } from 'react';
+import { useState, useEffect, Fragment, type ReactNode } from 'react';
 import { KsIconButton, KsButton, KsInput, KsStatusDot } from '@byted-keystone/react';
 import {
   KsIconRefresh,
@@ -72,10 +72,34 @@ function UsesRow({ label, items }: { label: string; items: AnswerSource[] }) {
 interface Props {
   question: TestQuestion;
   onClose?: () => void;
+  /** Lifts the rating so the console table chip updates too. */
+  onRate?: (rating: Rating) => void;
 }
 
-export default function EvaluatePanel({ question, onClose }: Props) {
+export default function EvaluatePanel({ question, onClose, onRate }: Props) {
   const [rating, setRating] = useState<Rating>(question.rating);
+
+  const rate = (next: Rating) => {
+    setRating(next);
+    onRate?.(next);
+  };
+
+  /** G / A / P shortcuts, as advertised by the kbd hints on the rating buttons. */
+  useEffect(() => {
+    const keys: Record<string, Rating> = { g: 'good', a: 'acceptable', p: 'poor' };
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = el?.closest('input, textarea, ks-input, [contenteditable="true"]');
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      const next = keys[e.key.toLowerCase()];
+      if (next) {
+        e.preventDefault();
+        rate(next);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   return (
     <section className="panel evaluate" aria-label="Evaluate answer">
@@ -99,7 +123,7 @@ export default function EvaluatePanel({ question, onClose }: Props) {
             <span className="fin-mark">
               <KsIconWand size="14" />
             </span>
-            Fin • AI Agent
+            AI Agent
           </div>
           <div className="fin-answer-text">{renderRich(question.answer)}</div>
         </div>
@@ -117,21 +141,21 @@ export default function EvaluatePanel({ question, onClose }: Props) {
         </div>
         <div className="rate-buttons">
           {ratingButtons.map((b) => (
-            <div className="rate-button-slot" key={b.key}>
-              <KsButton
-                className="rate-button"
-                variant="default"
-                size="md"
-                forceActive={rating === b.key}
-                onClick={() => setRating(b.key)}
-              >
-                <span className="rate-btn-inner">
-                  <KsStatusDot variant={b.dot} size="sm" />
-                  {b.label}
-                  <span className="kbd">{b.kbd}</span>
-                </span>
-              </KsButton>
-            </div>
+            <KsButton
+              key={b.key}
+              className="rate-button"
+              variant="default"
+              size="md"
+              forceActive={rating === b.key}
+              aria-pressed={rating === b.key}
+              onClick={() => rate(b.key)}
+            >
+              <span className="rate-btn-inner">
+                <KsStatusDot variant={b.dot} size="sm" />
+                {b.label}
+                <span className="kbd">{b.kbd}</span>
+              </span>
+            </KsButton>
           ))}
         </div>
         <div className="rate-note">

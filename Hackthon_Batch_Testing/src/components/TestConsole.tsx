@@ -1,4 +1,11 @@
-import { KsButton, KsCheckbox, KsAvatar, KsDropdownButton, KsTag } from '@byted-keystone/react';
+import {
+  KsButton,
+  KsCheckbox,
+  KsAvatar,
+  KsDivider,
+  KsDropdownButton,
+  KsTag,
+} from '@byted-keystone/react';
 import {
   KsIconNotes,
   KsIconChevronDown,
@@ -21,6 +28,11 @@ const testingAsOptions = [
   { value: 'preview', label: 'Preview user' },
   { value: 'new', label: 'New user' },
   { value: 'existing', label: 'Existing user' },
+];
+const statusOptions = [
+  { value: 'any', label: 'Any' },
+  { value: 'answered', label: 'Answered' },
+  { value: 'unanswered', label: 'Unanswered' },
 ];
 const ratingOptions = [
   { value: 'any', label: 'Any' },
@@ -83,12 +95,18 @@ export default function TestConsole({ group, selectedId, onSelect }: Props) {
       <div className="filter-row">
         <div className="testing-as">
           <span>Testing as</span>
-          <KsDropdownButton variant="tertiary" size="sm" options={testingAsOptions}>
+          <KsDropdownButton variant="text" size="sm" options={testingAsOptions}>
             <span className="chip-inner">
               <KsIconChangeUser size="16" /> Preview user
             </span>
           </KsDropdownButton>
         </div>
+        <KsDivider className="filter-sep" orientation="vertical" />
+        <KsDropdownButton variant="default" size="sm" options={statusOptions}>
+          <span className="chip-inner">
+            <KsIconHelp size="16" /> Answer status is Any
+          </span>
+        </KsDropdownButton>
         <KsDropdownButton variant="default" size="sm" options={ratingOptions}>
           <span className="chip-inner">
             <KsIconStar size="16" /> Answer rating is Any
