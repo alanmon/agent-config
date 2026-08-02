@@ -126,7 +126,7 @@ export default function EvaluatePanel({ question, evaluated, onClose, onReview }
   return (
     <section className="panel evaluate" aria-label="Root cause inspector">
       <div className="eval-head">
-        <span className="eval-title">Root Cause Inspector</span>
+        <span className="eval-title">Inspector</span>
         <div className="eval-head-actions">
           <KsIconButton variant="text" size="sm" aria-label="Regenerate" disabled={!question}>
             <KsIconRefresh size="18" />
