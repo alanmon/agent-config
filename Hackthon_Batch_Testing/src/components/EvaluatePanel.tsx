@@ -1,4 +1,4 @@
-import { useState, Fragment, type ReactNode } from 'react';
+import { useState, useEffect, Fragment, type ReactNode } from 'react';
 import { KsIconButton, KsButton, KsInput, KsEmptyState, KsTag } from '@byted-keystone/react';
 import {
   KsIconRefresh,
@@ -112,7 +112,20 @@ interface Props {
   onReview?: (id: string, review: ReviewVerdict) => void;
 }
 
+/** Matches the console's run animation so a re-run feels like the same operation. */
+const REGEN_DELAY_MS = 1100;
+
 export default function EvaluatePanel({ question, evaluated, onClose, onReview }: Props) {
+  // Prototype re-run: there is no backend, so the panel just plays the working
+  // state and lands back on the same stored diagnosis.
+  const [regenerating, setRegenerating] = useState(false);
+
+  useEffect(() => {
+    if (!regenerating) return;
+    const timer = window.setTimeout(() => setRegenerating(false), REGEN_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [regenerating]);
+
   const showResult = evaluated && !!question?.status;
   const failing = question?.status === 'failure' || question?.status === 'knowledge_gap';
   const causeVariant = question?.rootCause
@@ -128,8 +141,16 @@ export default function EvaluatePanel({ question, evaluated, onClose, onReview }
       <div className="eval-head">
         <span className="eval-title">Inspector</span>
         <div className="eval-head-actions">
-          <KsIconButton variant="text" size="sm" aria-label="Regenerate" disabled={!question}>
-            <KsIconRefresh size="18" />
+          <KsIconButton
+            variant="text"
+            size="sm"
+            aria-label="Re-run evaluation"
+            disabled={!question || !showResult || regenerating}
+            onClick={() => setRegenerating(true)}
+          >
+            <span className={regenerating ? 'is-spinning' : undefined}>
+              <KsIconRefresh size="18" />
+            </span>
           </KsIconButton>
           <KsIconButton variant="text" size="sm" aria-label="Close" onClick={onClose}>
             <KsIconClose size="18" />
@@ -144,6 +165,25 @@ export default function EvaluatePanel({ question, evaluated, onClose, onReview }
           title="No question selected"
           description="Select a question to see how your agent responds, and its diagnosis."
         />
+      ) : regenerating ? (
+        <div className="eval-body">
+          <div className="chat-question">{question.question}</div>
+          <div className="eval-waiting">
+            <KsEmptyState
+              size="sm"
+              title="Re-running evaluation"
+              description="Sending this question to the agent again and re-grading the answer."
+              footer={
+                <span className="eval-waiting-hint">
+                  <span className="is-spinning">
+                    <KsIconRefresh size="16" />
+                  </span>{' '}
+                  Working…
+                </span>
+              }
+            />
+          </div>
+        </div>
       ) : !showResult ? (
         <div className="eval-body">
           <div className="chat-question">{question.question}</div>
