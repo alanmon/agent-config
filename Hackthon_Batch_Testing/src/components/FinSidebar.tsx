@@ -1,8 +1,9 @@
-import { useState } from 'react';
 import { KsNavItem, KsSideNavigation } from '@byted-keystone/react';
 
 /** Flat navigation for the Lead agent hub. */
-const navItems = [
+export type AgentSection = 'dashboard' | 'knowledge' | 'rules' | 'test' | 'deploy' | 'setting';
+
+const navItems: Array<{ value: AgentSection; label: string }> = [
   { value: 'dashboard', label: 'Dashboard' },
   { value: 'knowledge', label: 'Knowledge' },
   { value: 'rules', label: 'Rules' },
@@ -11,19 +12,22 @@ const navItems = [
   { value: 'setting', label: 'Setting' },
 ];
 
-/** Feature-level navigation shown beside the global Ads Manager rail. */
-export default function FinSidebar() {
-  const [active, setActive] = useState('test');
+interface Props {
+  active: AgentSection;
+  onNavigate: (section: AgentSection) => void;
+}
 
+/** Feature-level navigation shown beside the global Ads Manager rail. */
+export default function FinSidebar({ active, onNavigate }: Props) {
   return (
-    <KsSideNavigation className="agent-sidebar" title={<span>Lead agent hub</span>}>
+    <KsSideNavigation className="agent-sidebar" title={<span>Lead Agent Hub</span>}>
       {navItems.map((item) => (
         <KsNavItem
           key={item.value}
           value={item.value}
           size="md"
           active={active === item.value}
-          onClick={() => setActive(item.value)}
+          onClick={() => onNavigate(item.value)}
         >
           {item.label}
         </KsNavItem>

@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment, type ReactNode } from 'react';
-import { KsIconButton, KsButton, KsInput, KsEmptyState, KsTag } from '@byted-keystone/react';
+import { KsIconButton, KsInput, KsEmptyState, KsTag } from '@byted-keystone/react';
 import {
+  KsIconArrowLeft,
   KsIconRefresh,
   KsIconClose,
   KsIconWand,
@@ -10,8 +11,19 @@ import {
   KsIconPlayCircle,
   KsIconFilledCheck,
   KsIconFilledClose,
+  KsIconFilledLightbulb,
 } from '@fe-infra/keystone-icons-react';
-import type { AnswerSource, InstructionTrace, ReviewVerdict, TestQuestion } from '../data';
+import {
+  ANSWER_RATING_LABELS,
+  IMPROVEMENT_REASON_LABELS,
+  isHumanReviewComplete,
+  ratingFromStatus,
+  type AnswerRating,
+  type AnswerSource,
+  type ImprovementReason,
+  type InstructionTrace,
+  type TestQuestion,
+} from '../data';
 
 /** Render **bold** segments and paragraph breaks as React nodes. */
 function renderRich(text: string): ReactNode {
@@ -24,10 +36,59 @@ function renderRich(text: string): ReactNode {
   ));
 }
 
-const reviewButtons: { key: ReviewVerdict; label: string }[] = [
-  { key: 'agree', label: 'Agree' },
-  { key: 'disagree', label: 'Disagree' },
-];
+const ratingOptions: AnswerRating[] = ['good', 'acceptable', 'poor'];
+
+const ratingVariant: Record<AnswerRating, 'success' | 'warning' | 'error'> = {
+  good: 'success',
+  acceptable: 'warning',
+  poor: 'error',
+};
+
+const reasonOptions = Object.entries(IMPROVEMENT_REASON_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+const fallbackRecommendations: Record<ImprovementReason, { action: string; detail: string }> = {
+  content_gap: {
+    action: 'Update the relevant knowledge content',
+    detail: 'Add or revise a focused knowledge article so the agent can retrieve complete, current facts for this question.',
+  },
+  needs_clarification: {
+    action: 'Add clarification guidance',
+    detail: 'Tell the agent which customer details it must collect before answering ambiguous or context-dependent questions.',
+  },
+  instruction_conflict: {
+    action: 'Resolve conflicting guidance',
+    detail: 'Consolidate the competing rules into one ordered instruction that makes prerequisites, risk disclosure, and escalation explicit.',
+  },
+  tone: {
+    action: 'Adjust tone guidance',
+    detail: 'Add an example response and describe the level of empathy, confidence, and formality expected for this situation.',
+  },
+  length: {
+    action: 'Define answer-length guidance',
+    detail: 'Specify which details are required and when the agent should use a concise answer versus a structured explanation.',
+  },
+  language: {
+    action: 'Review language support',
+    detail: 'Confirm language detection and translation settings, then add localized guidance where the response should differ by region.',
+  },
+  tool_error: {
+    action: 'Review the automation configuration',
+    detail: 'Check the tool trigger, required inputs, permissions, and fallback behavior, then rerun this question.',
+  },
+  other: {
+    action: 'Review this answer with the configuration owner',
+    detail: 'Use the internal note to capture the expected behavior, then update the most relevant content, guidance, or automation.',
+  },
+};
+
+const suggestedReasonFor = (question: TestQuestion): ImprovementReason => {
+  if (question.rootCause?.label === 'Knowledge gap') return 'content_gap';
+  if (question.rootCause?.label === 'Instruction conflict') return 'instruction_conflict';
+  return 'other';
+};
 
 const rootCauseVariant: Record<string, 'warning' | 'error'> = {
   'Knowledge gap': 'warning',
@@ -111,7 +172,10 @@ interface Props {
   /** True while this question is being graded, so the panel shows it working. */
   evaluating?: boolean;
   onClose?: () => void;
-  onReview?: (id: string, review: ReviewVerdict) => void;
+  onReviewChange?: (
+    id: string,
+    changes: Partial<Pick<TestQuestion, 'humanRating' | 'ratingReason' | 'reviewNote'>>,
+  ) => void;
 }
 
 /** Matches the console's run animation so a re-run feels like the same operation. */
@@ -122,11 +186,12 @@ export default function EvaluatePanel({
   evaluated,
   evaluating = false,
   onClose,
-  onReview,
+  onReviewChange,
 }: Props) {
   // Prototype re-run: there is no backend, so the panel just plays the working
   // state and lands back on the same stored diagnosis.
   const [regenerating, setRegenerating] = useState(false);
+  const [view, setView] = useState<'answer' | 'improve'>('answer');
 
   useEffect(() => {
     if (!regenerating) return;
@@ -134,39 +199,115 @@ export default function EvaluatePanel({
     return () => window.clearTimeout(timer);
   }, [regenerating]);
 
+  useEffect(() => setView('answer'), [question?.id]);
+
   const showResult = evaluated && !!question?.status;
+  const aiRating = ratingFromStatus(question?.status ?? null);
+  const reviewComplete = !!question && isHumanReviewComplete(question);
   const failing = question?.status === 'failure' || question?.status === 'knowledge_gap';
   const causeVariant = question?.rootCause
     ? rootCauseVariant[question.rootCause.label] ?? 'warning'
     : 'warning';
-  // The review bar echoes the verdict the system actually reached, so there is
-  // never a blank label sitting next to a decided diagnosis.
+  // The review bar keeps the automated assessment distinct from the human
+  // decision, so a suggested rating is never mistaken for an approved one.
   const verdictLabel = question?.rootCause?.label ?? 'Pass';
   const verdictVariant: 'success' | 'warning' | 'error' = question?.rootCause ? causeVariant : 'success';
+  const suggestedReason = question ? suggestedReasonFor(question) : 'other';
+  const recommendationReason = question?.ratingReason ?? suggestedReason;
+  const recommendation = question?.fixSuggestion ?? fallbackRecommendations[recommendationReason];
+  const canImprove = !!question && reviewComplete && question.humanRating !== 'good';
+  const reviewStatusLabel = !question?.humanRating
+    ? 'Needs human review'
+    : !reviewComplete
+      ? 'Incomplete · choose a reason'
+      : question.humanRating === aiRating
+        ? 'AI rating confirmed'
+        : 'AI rating overridden';
 
   return (
     <section className="panel evaluate" aria-label="Root cause inspector">
       <div className="eval-head">
-        <span className="eval-title">Inspector</span>
+        {view === 'improve' ? (
+          <button type="button" className="improve-back" onClick={() => setView('answer')}>
+            <KsIconArrowLeft size="16" /> Back to answer
+          </button>
+        ) : (
+          <span className="eval-title">Inspector</span>
+        )}
         <div className="eval-head-actions">
-          <KsIconButton
-            variant="text"
-            size="sm"
-            aria-label="Re-run evaluation"
-            disabled={!question || !showResult || regenerating}
-            onClick={() => setRegenerating(true)}
-          >
-            <span className={regenerating ? 'is-spinning' : undefined}>
-              <KsIconRefresh size="18" />
-            </span>
-          </KsIconButton>
+          {view === 'answer' && (
+            <KsIconButton
+              variant="text"
+              size="sm"
+              aria-label="Re-run evaluation"
+              disabled={!question || !showResult || regenerating}
+              onClick={() => setRegenerating(true)}
+            >
+              <span className={regenerating ? 'is-spinning' : undefined}>
+                <KsIconRefresh size="18" />
+              </span>
+            </KsIconButton>
+          )}
           <KsIconButton variant="text" size="sm" aria-label="Close" onClick={onClose}>
             <KsIconClose size="18" />
           </KsIconButton>
         </div>
       </div>
 
-      {!question ? (
+      {view === 'improve' && question && showResult && question.humanRating ? (
+        <div className="improve-view">
+          <div className="improve-view-heading">
+            <span className="improve-view-icon"><KsIconFilledLightbulb size="20" /></span>
+            <div>
+              <h2>Improve this answer</h2>
+              <p>Recommendation tailored to the reviewed answer and attributed root cause.</p>
+            </div>
+          </div>
+
+          <div className="improve-question">{question.question}</div>
+
+          <div className="improve-facts">
+            <div>
+              <span>Human rating</span>
+              <KsTag variant={ratingVariant[question.humanRating]} size="sm">
+                {ANSWER_RATING_LABELS[question.humanRating]}
+              </KsTag>
+            </div>
+            <div>
+              <span>AI diagnosis</span>
+              <KsTag variant={verdictVariant} size="sm">{verdictLabel}</KsTag>
+            </div>
+            {question.ratingReason && (
+              <div className="is-full">
+                <span>Review reason</span>
+                <strong>{IMPROVEMENT_REASON_LABELS[question.ratingReason]}</strong>
+              </div>
+            )}
+          </div>
+
+          {question.rootCause && (
+            <div className={`improve-diagnosis improve-diagnosis-${causeVariant}`}>
+              <span>Why the AI attributed this root cause</span>
+              <p>{question.rootCause.detail}</p>
+            </div>
+          )}
+
+          <div className="improve-recommendation">
+            <div className="improve-recommendation-label">
+              <KsIconWand size="16" /> Recommended change
+            </div>
+            <h3>{recommendation.action}</h3>
+            <p>{recommendation.detail}</p>
+          </div>
+
+          {question.reviewNote && (
+            <div className="improve-note">
+              <span>Internal note</span>
+              <p>{question.reviewNote}</p>
+            </div>
+          )}
+        </div>
+      ) : !question ? (
         <KsEmptyState
           autoCenter
           size="sm"
@@ -199,7 +340,7 @@ export default function EvaluatePanel({
             <KsEmptyState
               size="sm"
               title="Not yet evaluated"
-              description="Click “Run evaluation” to generate this answer and grade it as Pass, Failure, or Knowledge gap."
+              description="This question is queued. The AI will answer it automatically in top-to-bottom order."
               footer={
                 <span className="eval-waiting-hint">
                   <KsIconPlayCircle size="16" /> Waiting for evaluation
@@ -219,7 +360,7 @@ export default function EvaluatePanel({
                 <span className="fin-mark">
                   <KsIconWand size="14" />
                 </span>
-                Fin • AI Agent
+                AI Agent
               </div>
               <div className="fin-answer-text">{renderRich(question.answer)}</div>
             </div>
@@ -234,10 +375,11 @@ export default function EvaluatePanel({
               </div>
             )}
 
-            {/* Root cause on its own only when there's no fix card to carry it. */}
-            {question.rootCause && !question.fixSuggestion && (
+            {/* The AI diagnosis remains visible; the fix is revealed only from Improve. */}
+            {question.rootCause && (
               <div className={`root-cause root-cause-${causeVariant}`}>
                 <div className="root-cause-head">
+                  <span className="root-cause-label">AI diagnosis</span>
                   <KsTag variant={causeVariant} size="sm">
                     {question.rootCause.label}
                   </KsTag>
@@ -249,59 +391,90 @@ export default function EvaluatePanel({
             {/* 3 — Sources. */}
             <div className="section-label">This answer uses:</div>
             <UsesRow
-              label="Content"
+              label="Knowledge"
               items={question.content}
               defaultOpen={failing}
               emptyText={question.searchEvidence}
             />
-            <UsesRow label="Guidance" items={question.guidance} defaultOpen={failing} />
-
-            {/* 4 — Fix Suggestion: the root cause plus what to do about it. */}
-            {question.fixSuggestion && (
-              <div className={`fix-card fix-card-${causeVariant}`}>
-                <div className="fix-head">
-                  <span className="fix-head-label">Root cause</span>
-                  {question.rootCause && (
-                    <KsTag variant={causeVariant} size="sm">
-                      {question.rootCause.label}
-                    </KsTag>
-                  )}
-                </div>
-                {question.rootCause && <div className="fix-cause">{question.rootCause.detail}</div>}
-                <div className="fix-action">
-                  <KsIconWand size="14" /> {question.fixSuggestion.action}
-                </div>
-                <div className="fix-detail">{question.fixSuggestion.detail}</div>
-              </div>
-            )}
+            <UsesRow label="Rules" items={question.guidance} defaultOpen={failing} />
           </div>
 
           <div className="review-section">
-            <div className="review-row">
-              <span className="review-label">System verdict</span>
-              <KsTag variant={verdictVariant} size="sm">
-                {verdictLabel}
-              </KsTag>
-              <div className="review-buttons">
-                {reviewButtons.map((b) => (
-                  <KsButton
-                    key={b.key}
-                    className="review-button"
-                    variant="default"
-                    size="sm"
-                    forceActive={question.review === b.key}
-                    onClick={() => onReview?.(question.id, b.key)}
-                  >
-                    {b.label}
-                  </KsButton>
-                ))}
+            <div className="review-heading">
+              <div>
+                <strong>Rate the AI response</strong>
+                <span>{reviewStatusLabel}</span>
               </div>
+              {aiRating && (
+                <span className="ai-suggested-rating">
+                  AI suggested
+                  <KsTag variant={ratingVariant[aiRating]} size="sm">
+                    {ANSWER_RATING_LABELS[aiRating]}
+                  </KsTag>
+                </span>
+              )}
             </div>
-            {/* The note only earns its place once there's a disagreement to explain. */}
-            {question.review === 'disagree' && (
-              <div className="review-note">
-                <KsInput placeholder="What did the system get wrong?" />
+
+            <div className="rating-options" role="group" aria-label="Human answer rating">
+              {ratingOptions.map((rating) => (
+                <button
+                  type="button"
+                  key={rating}
+                  className={`rating-option rating-${rating}${question.humanRating === rating ? ' is-selected' : ''}`}
+                  aria-pressed={question.humanRating === rating}
+                  onClick={() => onReviewChange?.(question.id, {
+                    humanRating: rating,
+                    ratingReason: rating === 'poor' ? question.ratingReason : null,
+                    reviewNote: rating === 'good' ? '' : question.reviewNote,
+                  })}
+                >
+                  <span className="rating-dot" />
+                  {ANSWER_RATING_LABELS[rating]}
+                </button>
+              ))}
+            </div>
+
+            {question.humanRating === 'poor' && (
+              <div className="review-field">
+                <label>Reason for Poor rating <span>Required</span></label>
+                <select
+                  className="review-reason-select"
+                  value={question.ratingReason ?? ''}
+                  aria-label="Reason for Poor rating"
+                  onChange={(event) => onReviewChange?.(question.id, {
+                    ratingReason: event.target.value as ImprovementReason,
+                  })}
+                >
+                  <option value="" disabled>
+                    Select a reason · AI suggests {IMPROVEMENT_REASON_LABELS[suggestedReason]}
+                  </option>
+                  {reasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
+            )}
+
+            {(question.humanRating === 'acceptable' || question.humanRating === 'poor') && (
+              <div className="review-field">
+                <label>Internal note <span>Optional</span></label>
+                <KsInput
+                  value={question.reviewNote}
+                  placeholder="Add context for your team or CSV report"
+                  onChange={(value) => onReviewChange?.(question.id, { reviewNote: String(value) })}
+                />
+              </div>
+            )}
+
+            {question.humanRating && question.humanRating !== 'good' && (
+              <button
+                type="button"
+                className="improve-answer-button"
+                disabled={!canImprove}
+                onClick={() => setView('improve')}
+              >
+                <KsIconFilledLightbulb size="16" /> Improve this answer
+              </button>
             )}
           </div>
         </>

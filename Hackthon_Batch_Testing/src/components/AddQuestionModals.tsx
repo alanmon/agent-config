@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { KsModal, KsCheckbox, KsInput, KsButton } from '@byted-keystone/react';
+import { KsModal, KsInput, KsButton, KsRadio, KsRadioGroup, KsSelect } from '@byted-keystone/react';
 import { KsIconDelete, KsIconPlus } from '@fe-infra/keystone-icons-react';
-import { CATEGORIES, questionBank, type TestQuestion } from '../data';
+import { CATEGORIES, questionBank, type Category, type TestQuestion } from '../data';
+import type { TestingAs } from './TestConsole';
 
 interface GenerateProps {
   open: boolean;
@@ -10,98 +11,150 @@ interface GenerateProps {
   onConfirm: (questions: TestQuestion[]) => void;
 }
 
-/** Lets users multi-select from the generated candidate pool, grouped by category. */
+type GenerationSource = 'all' | 'topic';
+
+const lookbackOptions = [
+  { value: 30, label: 'Last 30 days' },
+  { value: 60, label: 'Last 60 days' },
+  { value: 90, label: 'Last 90 days' },
+];
+
+const countValues = [5, 10, 25, 50];
+
+/** Mirrors Fin's generation setup while sourcing questions from local mock data. */
 export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm }: GenerateProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [source, setSource] = useState<GenerationSource>('all');
+  const [topic, setTopic] = useState<Category>('Price');
+  const [lookback, setLookback] = useState(90);
+  const [questionCount, setQuestionCount] = useState(10);
+  const [generating, setGenerating] = useState(false);
+  const timer = useRef<number | null>(null);
 
   const available = useMemo(() => questionBank.filter((q) => !existingIds.has(q.id)), [existingIds]);
-  const byCategory = useMemo(() => {
-    return CATEGORIES.map((category) => ({
-      category,
-      items: available.filter((q) => q.category === category),
-    })).filter((g) => g.items.length > 0);
-  }, [available]);
+  const availableTopics = useMemo(
+    () => CATEGORIES.filter((category) => available.some((q) => q.category === category)),
+    [available],
+  );
+  const topicOptions = availableTopics.map((category) => ({ value: category, label: category }));
+  const sourcePool = source === 'all' ? available : available.filter((q) => q.category === topic);
+  const selectableCounts = countValues.filter((value) => value <= sourcePool.length);
+  if (sourcePool.length > 0 && !selectableCounts.includes(sourcePool.length)) {
+    selectableCounts.push(Math.min(sourcePool.length, 50));
+  }
+  const availableCountOptions = selectableCounts
+    .sort((a, b) => a - b)
+    .map((value) => ({ value, label: `${value} questions` }));
+  const generatedTotal = Math.min(questionCount, sourcePool.length, 50);
 
-  const allSelected = available.length > 0 && selected.size === available.length;
+  useEffect(() => {
+    if (!open) return;
+    setSource('all');
+    setTopic(availableTopics[0] ?? 'Price');
+    setLookback(90);
+    setQuestionCount(10);
+    setGenerating(false);
+  }, [open]);
 
-  const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  useEffect(() => {
+    if (selectableCounts.length > 0 && sourcePool.length < questionCount) {
+      setQuestionCount(selectableCounts[selectableCounts.length - 1]);
+    }
+  }, [source, topic, sourcePool.length, questionCount]);
 
-  const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(available.map((q) => q.id)));
-  };
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    },
+    [],
+  );
 
   const handleConfirm = () => {
-    if (selected.size === 0) return false;
-    const chosen = available.filter((q) => selected.has(q.id));
-    onConfirm(chosen);
-    setSelected(new Set());
-    return undefined;
+    if (generatedTotal === 0 || generating) return false;
+    setGenerating(true);
+    timer.current = window.setTimeout(() => {
+      onConfirm(sourcePool.slice(0, generatedTotal));
+      setGenerating(false);
+      timer.current = null;
+    }, 900);
+    return false;
   };
 
   const handleCancel = () => {
-    setSelected(new Set());
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    setGenerating(false);
     onCancel();
   };
 
   return (
     <KsModal
       open={open}
-      title="Auto-generate questions"
-      description="These questions are generated from your sources and knowledge base. Select the ones you want to test."
-      size="lg"
-      width={640}
+      title="Generate questions from past conversations"
+      description="Create a realistic test set from the questions customers have recently asked."
+      size="md"
+      width={600}
       confirmable
       cancelable
-      confirmText={selected.size > 0 ? `Add ${selected.size} question${selected.size === 1 ? '' : 's'}` : 'Add questions'}
+      confirmText={generating ? 'Generating…' : 'Generate questions'}
       cancelText="Cancel"
       onConfirm={handleConfirm}
       onCancel={handleCancel}
-      partProps={{ confirmButton: { disabled: selected.size === 0 } }}
+      partProps={{ confirmButton: { disabled: generatedTotal === 0 || generating, loading: generating } }}
       body={
         <div className="gen-modal-body">
-          <div
-            className="gen-modal-toolbar"
-            role="button"
-            tabIndex={0}
-            onClick={toggleAll}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') toggleAll();
-            }}
-          >
-            <KsCheckbox size="sm" checked={allSelected} />
-            <span>Select all ({available.length})</span>
-            <span className="gen-modal-count">{selected.size} selected</span>
+          <div className="gen-field">
+            <div className="gen-field-label">Generate from</div>
+            <KsRadioGroup
+              value={source}
+              orientation="vertical"
+              gap={12}
+              onChange={(value) => setSource(String(value) as GenerationSource)}
+            >
+              <KsRadio value="all">From all conversations</KsRadio>
+              <KsRadio value="topic" disabled={availableTopics.length === 0}>By topic</KsRadio>
+            </KsRadioGroup>
           </div>
-          <div className="gen-modal-list">
-            {byCategory.map(({ category, items }) => (
-              <div className="gen-modal-group" key={category}>
-                <div className="gen-modal-group-title">{category}</div>
-                {items.map((q) => (
-                  <div
-                    className="gen-modal-row"
-                    key={q.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => toggle(q.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') toggle(q.id);
-                    }}
-                  >
-                    <KsCheckbox size="sm" checked={selected.has(q.id)} />
-                    <span className="gen-modal-row-text">{q.question}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-            {byCategory.length === 0 && (
-              <div className="gen-modal-empty">All generated questions have already been added.</div>
+
+          {source === 'topic' && (
+            <div className="gen-field gen-topic-field">
+              <label className="gen-field-label">Topic</label>
+              <KsSelect
+                value={topic}
+                options={topicOptions}
+                search
+                placeholder="Select a topic"
+                onChange={(value) => setTopic(String(value) as Category)}
+              />
+            </div>
+          )}
+
+          <div className="gen-config-grid">
+            <div className="gen-field">
+              <label className="gen-field-label">Conversation period</label>
+              <KsSelect
+                value={lookback}
+                options={lookbackOptions}
+                onChange={(value) => setLookback(Number(value))}
+              />
+            </div>
+            <div className="gen-field">
+              <label className="gen-field-label">Number of questions</label>
+              <KsSelect
+                value={questionCount}
+                options={availableCountOptions}
+                onChange={(value) => setQuestionCount(Number(value))}
+              />
+            </div>
+          </div>
+
+          <div className={`gen-summary${generatedTotal === 0 ? ' is-empty' : ''}`}>
+            {generatedTotal > 0 ? (
+              <>
+                <b>{generatedTotal} questions</b> will be generated from conversations in the last {lookback} days
+                {source === 'topic' ? ` about ${topic}` : ''}.
+              </>
+            ) : (
+              'No more matching conversations are available for this test group.'
             )}
           </div>
         </div>
@@ -239,6 +292,205 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
               {filled.length} ready to add
             </span>
           </div>
+        </div>
+      }
+    />
+  );
+}
+
+export type CreateGroupMethod = 'generate' | 'manual' | 'csv';
+
+interface CreateGroupProps {
+  open: boolean;
+  onCancel: () => void;
+  onConfirm: (name: string, method: CreateGroupMethod) => void;
+}
+
+/** Creates a saved group and routes directly into the chosen question source. */
+export function CreateGroupModal({ open, onCancel, onConfirm }: CreateGroupProps) {
+  const [name, setName] = useState('');
+  const [method, setMethod] = useState<CreateGroupMethod>('generate');
+
+  useEffect(() => {
+    if (!open) return;
+    setName('');
+    setMethod('generate');
+  }, [open]);
+
+  return (
+    <KsModal
+      open={open}
+      title="Create new group"
+      description="Save related questions, answers, and test settings together so you can revisit and rerun them later."
+      size="md"
+      width={600}
+      confirmable
+      cancelable
+      confirmText="Create group"
+      cancelText="Cancel"
+      onConfirm={() => {
+        onConfirm(name.trim(), method);
+        return undefined;
+      }}
+      onCancel={onCancel}
+      body={
+        <div className="create-group-body">
+          <div className="gen-field">
+            <label className="gen-field-label">Name <span className="optional-label">(optional)</span></label>
+            <KsInput
+              placeholder="e.g. Medication safety questions"
+              value={name}
+              onChange={(value: string) => setName(value)}
+            />
+          </div>
+          <div className="gen-field">
+            <div className="gen-field-label">How do you want to add questions?</div>
+            <KsRadioGroup
+              value={method}
+              orientation="vertical"
+              gap={12}
+              onChange={(value) => setMethod(String(value) as CreateGroupMethod)}
+            >
+              <KsRadio value="generate">
+                Generate from conversations
+                <span slot="description">Recommended · Create up to 50 questions from recent customer conversations.</span>
+              </KsRadio>
+              <KsRadio value="manual">
+                Add manually
+                <span slot="description">Enter exact edge cases, policies, or compliance questions.</span>
+              </KsRadio>
+              <KsRadio value="csv">
+                Upload CSV file
+                <span slot="description">Import a prepared single-column list of up to 50 questions.</span>
+              </KsRadio>
+            </KsRadioGroup>
+          </div>
+        </div>
+      }
+    />
+  );
+}
+
+interface DeleteGroupProps {
+  open: boolean;
+  groupName: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+export function DeleteGroupModal({ open, groupName, onCancel, onConfirm }: DeleteGroupProps) {
+  return (
+    <KsModal
+      open={open}
+      title="Delete group"
+      description={`Delete “${groupName}” and its saved questions, responses, and test settings? This can't be undone.`}
+      size="sm"
+      confirmable
+      cancelable
+      confirmText="Delete group"
+      cancelText="Cancel"
+      onConfirm={() => {
+        onConfirm();
+        return undefined;
+      }}
+      onCancel={onCancel}
+      body={<div className="manual-modal-body" />}
+    />
+  );
+}
+
+interface GroupSettingsProps {
+  open: boolean;
+  value: TestingAs;
+  onCancel: () => void;
+  onConfirm: (value: TestingAs) => void;
+}
+
+export function GroupSettingsModal({ open, value, onCancel, onConfirm }: GroupSettingsProps) {
+  const [draft, setDraft] = useState<TestingAs>(value);
+
+  useEffect(() => {
+    if (open) setDraft(value);
+  }, [open, value]);
+
+  return (
+    <KsModal
+      open={open}
+      title="Group settings"
+      description="These settings are saved with this group and restored whenever you return to it."
+      size="sm"
+      confirmable
+      cancelable
+      confirmText="Save settings"
+      cancelText="Cancel"
+      onConfirm={() => {
+        onConfirm(draft);
+        return undefined;
+      }}
+      onCancel={onCancel}
+      body={
+        <div className="create-group-body">
+          <div className="gen-field-label">Testing as</div>
+          <KsRadioGroup
+            value={draft}
+            orientation="vertical"
+            gap={12}
+            onChange={(next) => setDraft(String(next) as TestingAs)}
+          >
+            <KsRadio value="preview">Preview user</KsRadio>
+            <KsRadio value="new">New user</KsRadio>
+            <KsRadio value="existing">Existing user</KsRadio>
+          </KsRadioGroup>
+        </div>
+      }
+    />
+  );
+}
+
+interface RenameListProps {
+  open: boolean;
+  currentName: string;
+  onCancel: () => void;
+  onConfirm: (name: string) => void;
+}
+
+/** Renames the current test list. */
+export function RenameListModal({ open, currentName, onCancel, onConfirm }: RenameListProps) {
+  const [name, setName] = useState(currentName);
+
+  // Reopen should always start from the name that is live right now.
+  useEffect(() => {
+    if (open) setName(currentName);
+  }, [open, currentName]);
+
+  const trimmed = name.trim();
+
+  const handleConfirm = () => {
+    if (!trimmed) return false;
+    onConfirm(trimmed);
+    return undefined;
+  };
+
+  return (
+    <KsModal
+      open={open}
+      title="Rename group"
+      description="Give this test group a name your team will recognise."
+      size="sm"
+      confirmable
+      cancelable
+      confirmText="Rename group"
+      cancelText="Cancel"
+      onConfirm={handleConfirm}
+      onCancel={onCancel}
+      partProps={{ confirmButton: { disabled: !trimmed } }}
+      body={
+        <div className="manual-modal-body">
+          <KsInput
+            placeholder="e.g. Pre-launch consultation checks"
+            value={name}
+            onChange={(value: string) => setName(value)}
+          />
         </div>
       }
     />

@@ -1,141 +1,317 @@
-import { KsButton, KsCheckbox, KsDropdownButton, KsTag, KsEmptyState } from '@byted-keystone/react';
+import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
+import { KsCheckbox, KsTag } from '@byted-keystone/react';
 import {
-  KsIconChevronDown,
   KsIconEdit,
   KsIconPlus,
   KsIconChangeUser,
   KsIconHelp,
   KsIconWand,
-  KsIconColoredExcel,
+  KsIconUpload,
   KsIconFilledCheck,
   KsIconFilledClose,
   KsIconFilledWarning,
-  KsIconPlayCircle,
 } from '@fe-infra/keystone-icons-react';
-import type { EvalStatus, TestGroup, TestQuestion } from '../data';
+import {
+  ANSWER_RATING_LABELS,
+  isHumanReviewComplete,
+  ratingFromStatus,
+  type AnswerRating,
+  type TestGroup,
+  type TestQuestion,
+} from '../data';
 
-const testingAsOptions = [
-  { value: 'preview', label: 'Preview user' },
-  { value: 'new', label: 'New user' },
-  { value: 'existing', label: 'Existing user' },
-];
+export type TestingAs = 'preview' | 'new' | 'existing';
 
-type AddAction = 'manual' | 'generate' | 'csv' | 'inbox';
+const testingAsLabels: Record<TestingAs, string> = {
+  preview: 'Preview user',
+  new: 'New user',
+  existing: 'Existing user',
+};
 
-const addQuestionsOptions = (onSelect: (action: AddAction) => void) => [
-  { value: 'manual', label: 'Add manually', onClick: () => onSelect('manual') },
-  { value: 'generate', label: 'Generate questions', onClick: () => onSelect('generate') },
-  { value: 'csv', label: 'Import from a .csv', onClick: () => onSelect('csv') },
-  { value: 'inbox', label: 'Import from inbox', onClick: () => onSelect('inbox') },
-];
+type AddAction = 'manual' | 'generate' | 'csv';
 
-const statusTag: Record<EvalStatus, { variant: 'success' | 'warning' | 'error'; label: string }> = {
-  pass: { variant: 'success', label: 'Pass' },
-  knowledge_gap: { variant: 'warning', label: 'Knowledge gap' },
-  failure: { variant: 'error', label: 'Failure' },
+export interface SavedGroupOption {
+  id: string;
+  title: string;
+}
+
+export type ManageAction = 'settings' | 'rename' | 'export' | 'delete' | 'create';
+
+const closeMenu = (event: MouseEvent<HTMLButtonElement>) => {
+  event.currentTarget.closest('details')?.removeAttribute('open');
+};
+
+const ratingTag: Record<AnswerRating, { variant: 'success' | 'warning' | 'error'; label: string }> = {
+  good: { variant: 'success', label: 'Good' },
+  acceptable: { variant: 'warning', label: 'Acceptable' },
+  poor: { variant: 'error', label: 'Poor' },
+};
+
+const reviewState = (question: TestQuestion, aiRating: AnswerRating | null) => {
+  if (!question.humanRating) return { label: 'Needs review', className: 'is-pending' };
+  if (!isHumanReviewComplete(question)) return { label: 'Incomplete', className: 'is-incomplete' };
+  const humanLabel = ANSWER_RATING_LABELS[question.humanRating];
+  return question.humanRating === aiRating
+    ? { label: `Reviewed · ${humanLabel}`, className: 'is-reviewed' }
+    : { label: `Overridden · ${humanLabel}`, className: 'is-overridden' };
 };
 
 interface Props {
   group: TestGroup;
+  savedGroups: SavedGroupOption[];
+  activeGroupId: string;
   selectedId: string | null;
   onSelect: (q: TestQuestion) => void;
   onAddAction: (action: AddAction) => void;
-  /** Questions that have been graded — by bulk run or by being selected. */
+  /** Questions for which the agent produced an answer or follow-up action. */
   evaluatedIds: Set<string>;
-  /** Question currently being graded on its own, if any. */
+  /** Question currently being answered in the automatic queue, if any. */
   evaluatingId: string | null;
   running: boolean;
-  onRunEvaluation: () => void;
+  testingAs: TestingAs;
+  onTestingAsChange: (value: TestingAs) => void;
+  onSwitchGroup: (id: string) => void;
+  onCreateGroup: () => void;
+  onManageAction: (action: ManageAction) => void;
 }
 
 export default function TestConsole({
   group,
+  savedGroups,
+  activeGroupId,
   selectedId,
   onSelect,
   onAddAction,
   evaluatedIds,
   evaluatingId,
   running,
-  onRunEvaluation,
+  testingAs,
+  onTestingAsChange,
+  onSwitchGroup,
+  onCreateGroup,
+  onManageAction,
 }: Props) {
-  // Only graded questions count toward the summary.
+  const consoleRef = useRef<HTMLElement>(null);
+  const wasRunningRef = useRef(false);
+  const [showCompleteToast, setShowCompleteToast] = useState(false);
+
+  useEffect(() => {
+    const closeMenusOutside = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      consoleRef.current
+        ?.querySelectorAll<HTMLDetailsElement>('details.action-menu[open]')
+        .forEach((menu) => {
+          if (!menu.contains(event.target as Node)) menu.removeAttribute('open');
+        });
+    };
+
+    document.addEventListener('pointerdown', closeMenusOutside);
+    return () => document.removeEventListener('pointerdown', closeMenusOutside);
+  }, []);
+
+  useEffect(() => {
+    const justCompleted =
+      wasRunningRef.current &&
+      !running &&
+      group.questions.length > 0 &&
+      evaluatedIds.size === group.questions.length;
+
+    wasRunningRef.current = running;
+    if (!justCompleted) return;
+
+    setShowCompleteToast(true);
+    const timer = window.setTimeout(() => setShowCompleteToast(false), 3600);
+    return () => window.clearTimeout(timer);
+  }, [evaluatedIds.size, group.questions.length, running]);
+
+  // Human ratings take precedence once complete; unreviewed questions fall
+  // back to the AI proposal so the summary always covers the full test.
   const counts = group.questions.reduce(
     (acc, q) => {
-      if (q.status && evaluatedIds.has(q.id)) acc[q.status] += 1;
+      if (!evaluatedIds.has(q.id)) return acc;
+      const aiRating = ratingFromStatus(q.status);
+      const effectiveRating = isHumanReviewComplete(q) ? q.humanRating : aiRating;
+      if (effectiveRating) acc[effectiveRating] += 1;
       return acc;
     },
-    { pass: 0, knowledge_gap: 0, failure: 0 } as Record<EvalStatus, number>
+    { good: 0, acceptable: 0, poor: 0 } as Record<AnswerRating, number>
   );
 
   return (
-    <section className="panel console" aria-label="Test console">
-      {/* Header */}
-      <div className="console-head">
-        <div className="console-head-top">
-          <div className="head-actions">
-            <KsButton variant="default" size="md">
-              <span className="chip-inner">
-                <KsIconEdit size="16" /> Manage <KsIconChevronDown size="14" />
-              </span>
-            </KsButton>
-            <KsDropdownButton variant="default" size="md" options={addQuestionsOptions(onAddAction)}>
-              <span className="chip-inner">
-                <KsIconPlus size="16" /> Add questions
-              </span>
-            </KsDropdownButton>
-            <KsButton
-              variant="primary"
-              size="md"
-              disabled={group.questions.length === 0}
-              loading={running}
-              onClick={onRunEvaluation}
-            >
-              <span className="chip-inner">
-                <KsIconPlayCircle size="16" />
-                {running ? 'Running…' : 'Run test'}
-              </span>
-            </KsButton>
+    <section ref={consoleRef} className="panel console" aria-label="Test console">
+      {/* List tools only become relevant once a question exists. */}
+      {group.questions.length > 0 && (
+        <div className="console-head">
+          <div className="console-head-top">
+            <div>
+              {/* The list name doubles as the list-management menu. */}
+              <div className="group-title">
+                <details className="action-menu group-switcher">
+                  <summary className="group-switcher-trigger">
+                    <span className="group-title-text" role="heading" aria-level={1}>{group.title}</span>
+                  </summary>
+                  <div className="action-menu-popover group-switcher-menu">
+                    {savedGroups.map((savedGroup) => (
+                      <button
+                        type="button"
+                        className={savedGroup.id === activeGroupId ? 'is-selected' : ''}
+                        key={savedGroup.id}
+                        onClick={(event) => {
+                          closeMenu(event);
+                          onSwitchGroup(savedGroup.id);
+                        }}
+                      >
+                        <span>{savedGroup.title}</span>
+                        {savedGroup.id === activeGroupId && <span className="menu-check">✓</span>}
+                      </button>
+                    ))}
+                    <div className="action-menu-divider" />
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        closeMenu(event);
+                        onCreateGroup();
+                      }}
+                    >
+                      + Create new group
+                    </button>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div className="head-actions">
+              <details className="action-menu manage-menu">
+                <summary className="toolbar-menu-trigger">
+                  <span className="chip-inner"><KsIconEdit size="16" /> Manage</span>
+                </summary>
+                <div className="action-menu-popover">
+                  {([
+                    ['settings', 'Settings'],
+                    ['rename', 'Rename group'],
+                    ['export', 'Get CSV report'],
+                    ['delete', 'Delete group'],
+                    ['create', '+ Create new group'],
+                  ] as Array<[ManageAction, string]>).map(([action, label]) => (
+                    <button
+                      type="button"
+                      className={action === 'delete' ? 'is-danger' : ''}
+                      key={action}
+                      onClick={(event) => {
+                        closeMenu(event);
+                        onManageAction(action);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </details>
+              <details className={`action-menu${group.questions.length >= 50 ? ' is-disabled' : ''}`}>
+                <summary className="toolbar-menu-trigger is-primary">
+                  <span className="chip-inner"><KsIconPlus size="16" /> Add questions</span>
+                </summary>
+                <div className="action-menu-popover">
+                  {([
+                    ['generate', 'Generate from past conversations'],
+                    ['manual', 'Add questions manually'],
+                    ['csv', 'Upload a CSV file'],
+                  ] as Array<[AddAction, string]>).map(([action, label]) => (
+                    <button
+                      type="button"
+                      key={action}
+                      onClick={(event) => {
+                        closeMenu(event);
+                        onAddAction(action);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            </div>
           </div>
+          <hr className="console-divider" />
         </div>
-        <hr className="console-divider" />
-      </div>
+      )}
 
       {group.questions.length === 0 ? (
-        <KsEmptyState
-          autoCenter
-          title="No test questions added"
-          description="Add test questions to check for conflicting rules and knowledge gaps."
-          footer={
-            <div className="empty-actions">
-              <KsButton variant="primary" size="md" onClick={() => onAddAction('manual')}>
-                <span className="chip-inner">
-                  <KsIconEdit size="16" /> Add manually
-                </span>
-              </KsButton>
-              <KsButton variant="default" size="md" onClick={() => onAddAction('generate')}>
-                <span className="chip-inner">
-                  <KsIconWand size="16" /> Auto-generate
-                </span>
-              </KsButton>
-              <KsButton variant="default" size="md" onClick={() => onAddAction('csv')}>
-                <span className="chip-inner">
-                  <KsIconColoredExcel size="16" /> Import CSV
-                </span>
-              </KsButton>
-            </div>
-          }
-        />
+        <div className="question-start">
+          <div className="question-start-heading">
+            <h2>Let’s start by adding questions</h2>
+            <p>Choose the method that best matches what you want to test.</p>
+          </div>
+
+          <div className="question-start-options">
+            <article className="question-option is-recommended">
+              <div className="question-option-topline">
+                <span className="question-option-icon"><KsIconWand size="22" /></span>
+                <span className="question-option-badge">Recommended</span>
+              </div>
+              <h3>Generate from conversations</h3>
+              <p><b>Best for most teams.</b> Create up to 50 representative questions from recent customer conversations.</p>
+              <div className="question-option-action">
+                <button type="button" className="question-option-button is-primary" onClick={() => onAddAction('generate')}>
+                  Generate questions
+                </button>
+              </div>
+            </article>
+
+            <article className="question-option">
+              <div className="question-option-topline">
+                <span className="question-option-icon"><KsIconEdit size="22" /></span>
+              </div>
+              <h3>Add manually</h3>
+              <p><b>Best for edge cases.</b> Add exact questions for new policies, compliance checks, or scenarios without history.</p>
+              <div className="question-option-action">
+                <button type="button" className="question-option-button" onClick={() => onAddAction('manual')}>
+                  Add manually
+                </button>
+              </div>
+            </article>
+
+            <article className="question-option">
+              <div className="question-option-topline">
+                <span className="question-option-icon"><KsIconUpload size="22" /></span>
+              </div>
+              <h3>Upload CSV file</h3>
+              <p><b>Best for repeatable tests.</b> Import a prepared, single-column CSV containing up to 50 questions.</p>
+              <div className="question-option-action">
+                <button type="button" className="question-option-button" onClick={() => onAddAction('csv')}>
+                  Upload CSV
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
       ) : (
         <>
           {/* Filters */}
           <div className="filter-row">
             <div className="testing-as">
               <span>Testing as</span>
-              <KsDropdownButton variant="tertiary" size="sm" options={testingAsOptions}>
-                <span className="chip-inner">
-                  <KsIconChangeUser size="16" /> Preview user
-                </span>
-              </KsDropdownButton>
+              <details className="action-menu testing-menu">
+                <summary className="testing-menu-trigger">
+                  <span className="chip-inner"><KsIconChangeUser size="16" /> {testingAsLabels[testingAs]}</span>
+                </summary>
+                <div className="action-menu-popover testing-menu-popover">
+                  {(Object.entries(testingAsLabels) as Array<[TestingAs, string]>).map(([value, label]) => (
+                    <button
+                      type="button"
+                      className={value === testingAs ? 'is-selected' : ''}
+                      key={value}
+                      onClick={(event) => {
+                        closeMenu(event);
+                        onTestingAsChange(value);
+                      }}
+                    >
+                      <span>{label}</span>
+                      {value === testingAs && <span className="menu-check">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </details>
             </div>
           </div>
 
@@ -145,13 +321,13 @@ export default function TestConsole({
             {evaluatedIds.size > 0 && (
               <div className="summary-strip">
                 <span className="summary-chip pass">
-                  <KsIconFilledCheck size="14" /> Pass <b>{counts.pass}</b>
+                  <KsIconFilledCheck size="14" /> Good <b>{counts.good}</b>
                 </span>
                 <span className="summary-chip kg">
-                  <KsIconFilledWarning size="14" /> Knowledge gap <b>{counts.knowledge_gap}</b>
+                  <KsIconFilledWarning size="14" /> Acceptable <b>{counts.acceptable}</b>
                 </span>
                 <span className="summary-chip fail">
-                  <KsIconFilledClose size="14" /> Failure <b>{counts.failure}</b>
+                  <KsIconFilledClose size="14" /> Poor <b>{counts.poor}</b>
                 </span>
               </div>
             )}
@@ -163,20 +339,30 @@ export default function TestConsole({
               <KsCheckbox size="sm" />
             </span>
             <span>Question</span>
-            <span className="th">
+            <span
+              className="th"
+              title="Answered means the AI provided a direct answer, follow-up, or automation. It does not indicate answer quality."
+            >
               Answer status <KsIconHelp size="14" />
             </span>
-            <span className="th">
-              Result <KsIconHelp size="14" />
+            <span
+              className="th"
+              title="This rating is proposed by AI. It becomes reviewable separately by a human."
+            >
+              AI rating <KsIconHelp size="14" />
             </span>
+            <span>Human review</span>
           </div>
 
           {/* Rows */}
           <div className="q-list">
             {group.questions.map((q) => {
-              const resultKnown = evaluatedIds.has(q.id) && q.status;
-              const tag = resultKnown ? statusTag[q.status as EvalStatus] : null;
-              const pending = !resultKnown && (running || evaluatingId === q.id);
+              const answered = evaluatedIds.has(q.id);
+              const aiRating = answered ? ratingFromStatus(q.status) : null;
+              const tag = aiRating ? ratingTag[aiRating] : null;
+              const review = reviewState(q, aiRating);
+              const answering = !answered && evaluatingId === q.id;
+              const queued = !answered && running && !answering;
               return (
                 <div
                   key={q.id}
@@ -192,12 +378,31 @@ export default function TestConsole({
                     <KsCheckbox size="sm" />
                   </span>
                   <span className="q-question">{q.question}</span>
-                  <span className="q-status">{resultKnown && <KsIconFilledCheck size="18" />}</span>
+                  <span
+                    className="q-status"
+                    aria-label={answered ? 'Answered' : answering ? 'Answering' : 'Not answered'}
+                    title={answered ? 'The AI produced an answer or follow-up action.' : undefined}
+                  >
+                    {answered && <KsIconFilledCheck size="18" />}
+                    {answering && <span className="auto-run-indicator" />}
+                  </span>
                   <span>
                     {tag ? (
-                      <KsTag variant={tag.variant} size="sm">{tag.label}</KsTag>
+                      <span className="ai-rating">
+                        <KsTag variant={tag.variant} size="sm">{tag.label}</KsTag>
+                        <small>AI</small>
+                      </span>
                     ) : (
-                      <span className="q-status-empty">{pending ? 'Running…' : '—'}</span>
+                      <span className="q-status-empty">{answering ? 'Answering…' : queued ? 'Queued' : '—'}</span>
+                    )}
+                  </span>
+                  <span>
+                    {answered ? (
+                      <span className={`human-review ${review.className}`} title={review.label}>
+                        {review.label}
+                      </span>
+                    ) : (
+                      <span className="q-status-empty">—</span>
                     )}
                   </span>
                 </div>
@@ -205,6 +410,16 @@ export default function TestConsole({
             })}
           </div>
         </>
+      )}
+
+      {showCompleteToast && (
+        <div className="test-complete-toast" role="status" aria-live="polite">
+          <span className="test-complete-toast-icon"><KsIconFilledCheck size="16" /></span>
+          <span>
+            <b>Test complete</b>
+            <small>{group.questions.length} questions answered and rated</small>
+          </span>
+        </div>
       )}
     </section>
   );
