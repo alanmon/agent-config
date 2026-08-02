@@ -22,10 +22,15 @@ export default function App() {
   const [evaluated, setEvaluated] = useState(false);
   const [running, setRunning] = useState(false);
   const [modal, setModal] = useState<AddAction | null>(null);
+  // The inspector is dismissable; picking a question brings it back.
+  const [inspectorOpen, setInspectorOpen] = useState(true);
 
   const selected = questions.find((q) => q.id === selectedId) ?? null;
 
-  const handleSelect = (q: TestQuestion) => setSelectedId(q.id);
+  const handleSelect = (q: TestQuestion) => {
+    setSelectedId(q.id);
+    setInspectorOpen(true);
+  };
 
   const addQuestions = (newQuestions: TestQuestion[]) => {
     setQuestions((prev) => {
@@ -93,12 +98,15 @@ export default function App() {
                 onRunEvaluation={handleRunEvaluation}
               />
               {/* key resets per-question local state (expanded sources) */}
-              <EvaluatePanel
-                key={selected?.id ?? 'none'}
-                question={selected}
-                evaluated={evaluated}
-                onReview={handleReview}
-              />
+              {inspectorOpen && (
+                <EvaluatePanel
+                  key={selected?.id ?? 'none'}
+                  question={selected}
+                  evaluated={evaluated}
+                  onReview={handleReview}
+                  onClose={() => setInspectorOpen(false)}
+                />
+              )}
             </div>
           </main>
         )}
