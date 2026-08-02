@@ -1,6 +1,5 @@
-import { KsButton, KsCheckbox, KsAvatar, KsDropdownButton, KsTag, KsEmptyState } from '@byted-keystone/react';
+import { KsButton, KsCheckbox, KsDropdownButton, KsTag, KsEmptyState } from '@byted-keystone/react';
 import {
-  KsIconNotes,
   KsIconChevronDown,
   KsIconEdit,
   KsIconPlus,
@@ -68,28 +67,6 @@ export default function TestConsole({
       {/* Header */}
       <div className="console-head">
         <div className="console-head-top">
-          <div>
-            <div className="group-title">
-              <span className="title-doc">
-                <KsIconNotes size="18" />
-              </span>
-              {group.title}
-              <span className="title-doc">
-                <KsIconChevronDown size="18" />
-              </span>
-            </div>
-            <div className="group-sub">
-              <span>{group.updatedLabel}</span>
-              <KsAvatar size="xs">
-                {group.updatedBy
-                  .split(' ')
-                  .map((w) => w[0])
-                  .join('')
-                  .slice(0, 2)}
-              </KsAvatar>
-              <span>{group.updatedBy}</span>
-            </div>
-          </div>
           <div className="head-actions">
             <KsButton variant="default" size="md">
               <span className="chip-inner">
