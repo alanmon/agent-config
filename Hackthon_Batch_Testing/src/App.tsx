@@ -19,27 +19,42 @@ export default function App() {
   const [route, setRoute] = useState<Route>('hub');
   const [questions, setQuestions] = useState<TestQuestion[]>(initialGroup.questions);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [evaluated, setEvaluated] = useState(false);
+  // Evaluation is tracked per question: "Run test" grades the whole batch, and
+  // selecting a single unevaluated question grades just that one.
+  const [evaluatedIds, setEvaluatedIds] = useState<Set<string>>(new Set());
   const [running, setRunning] = useState(false);
+  const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
   const [modal, setModal] = useState<AddAction | null>(null);
   // The inspector is dismissable; picking a question brings it back.
   const [inspectorOpen, setInspectorOpen] = useState(true);
 
   const selected = questions.find((q) => q.id === selectedId) ?? null;
 
+  /** Grades one question after a short beat, so the panel shows it working. */
+  const evaluateOne = (id: string) => {
+    setEvaluatingId(id);
+    window.setTimeout(() => {
+      setEvaluatedIds((prev) => new Set(prev).add(id));
+      setEvaluatingId((current) => (current === id ? null : current));
+    }, RUN_DELAY_MS);
+  };
+
+  // Selecting a question runs it on the spot rather than waiting for "Run test".
   const handleSelect = (q: TestQuestion) => {
     setSelectedId(q.id);
     setInspectorOpen(true);
+    if (!evaluatedIds.has(q.id) && evaluatingId !== q.id && !running) evaluateOne(q.id);
   };
 
   const addQuestions = (newQuestions: TestQuestion[]) => {
-    setQuestions((prev) => {
-      const next = [...prev, ...newQuestions];
-      if (!selectedId && next.length > 0) setSelectedId(next[0].id);
-      return next;
-    });
-    // Newly added questions haven't been run yet — drop any stale results.
-    setEvaluated(false);
+    setQuestions((prev) => [...prev, ...newQuestions]);
+    // Nothing selected yet — land on the first arrival and grade it, so the
+    // panel never sits on an unevaluated question.
+    if (!selectedId && newQuestions.length > 0) {
+      const first = questions.length > 0 ? questions[0] : newQuestions[0];
+      setSelectedId(first.id);
+      if (!evaluatedIds.has(first.id)) evaluateOne(first.id);
+    }
     setModal(null);
   };
 
@@ -65,12 +80,14 @@ export default function App() {
     setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, review } : q)));
   };
 
+  /** Bulk run: grades every question in the batch at once. */
   const handleRunEvaluation = () => {
     if (questions.length === 0 || running) return;
     setRunning(true);
+    setEvaluatingId(null);
     window.setTimeout(() => {
       setRunning(false);
-      setEvaluated(true);
+      setEvaluatedIds(new Set(questions.map((q) => q.id)));
     }, RUN_DELAY_MS);
   };
 
@@ -93,7 +110,8 @@ export default function App() {
                 selectedId={selectedId}
                 onSelect={handleSelect}
                 onAddAction={setModal}
-                evaluated={evaluated}
+                evaluatedIds={evaluatedIds}
+                evaluatingId={evaluatingId}
                 running={running}
                 onRunEvaluation={handleRunEvaluation}
               />
@@ -102,7 +120,8 @@ export default function App() {
                 <EvaluatePanel
                   key={selected?.id ?? 'none'}
                   question={selected}
-                  evaluated={evaluated}
+                  evaluated={!!selected && evaluatedIds.has(selected.id)}
+                  evaluating={!!selected && (running || evaluatingId === selected.id)}
                   onReview={handleReview}
                   onClose={() => setInspectorOpen(false)}
                 />

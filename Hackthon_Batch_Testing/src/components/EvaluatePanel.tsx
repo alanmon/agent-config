@@ -108,6 +108,8 @@ function InstructionRow({ trace }: { trace: InstructionTrace }) {
 interface Props {
   question: TestQuestion | null;
   evaluated: boolean;
+  /** True while this question is being graded, so the panel shows it working. */
+  evaluating?: boolean;
   onClose?: () => void;
   onReview?: (id: string, review: ReviewVerdict) => void;
 }
@@ -115,7 +117,13 @@ interface Props {
 /** Matches the console's run animation so a re-run feels like the same operation. */
 const REGEN_DELAY_MS = 1100;
 
-export default function EvaluatePanel({ question, evaluated, onClose, onReview }: Props) {
+export default function EvaluatePanel({
+  question,
+  evaluated,
+  evaluating = false,
+  onClose,
+  onReview,
+}: Props) {
   // Prototype re-run: there is no backend, so the panel just plays the working
   // state and lands back on the same stored diagnosis.
   const [regenerating, setRegenerating] = useState(false);
@@ -165,14 +173,14 @@ export default function EvaluatePanel({ question, evaluated, onClose, onReview }
           title="No question selected"
           description="Select a question to see how your agent responds, and its diagnosis."
         />
-      ) : regenerating ? (
+      ) : regenerating || evaluating ? (
         <div className="eval-body">
           <div className="chat-question">{question.question}</div>
           <div className="eval-waiting">
             <KsEmptyState
               size="sm"
-              title="Re-running evaluation"
-              description="Sending this question to the agent again and re-grading the answer."
+              title={regenerating ? 'Re-running evaluation' : 'Running evaluation'}
+              description="Sending this question to the agent and grading the answer."
               footer={
                 <span className="eval-waiting-hint">
                   <span className="is-spinning">

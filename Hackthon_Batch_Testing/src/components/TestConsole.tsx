@@ -40,7 +40,10 @@ interface Props {
   selectedId: string | null;
   onSelect: (q: TestQuestion) => void;
   onAddAction: (action: AddAction) => void;
-  evaluated: boolean;
+  /** Questions that have been graded — by bulk run or by being selected. */
+  evaluatedIds: Set<string>;
+  /** Question currently being graded on its own, if any. */
+  evaluatingId: string | null;
   running: boolean;
   onRunEvaluation: () => void;
 }
@@ -50,13 +53,15 @@ export default function TestConsole({
   selectedId,
   onSelect,
   onAddAction,
-  evaluated,
+  evaluatedIds,
+  evaluatingId,
   running,
   onRunEvaluation,
 }: Props) {
+  // Only graded questions count toward the summary.
   const counts = group.questions.reduce(
     (acc, q) => {
-      if (q.status) acc[q.status] += 1;
+      if (q.status && evaluatedIds.has(q.id)) acc[q.status] += 1;
       return acc;
     },
     { pass: 0, knowledge_gap: 0, failure: 0 } as Record<EvalStatus, number>
@@ -137,7 +142,7 @@ export default function TestConsole({
           {/* Count + summary */}
           <div className="q-count-row">
             <div className="q-count">{group.questions.length} questions</div>
-            {evaluated && (
+            {evaluatedIds.size > 0 && (
               <div className="summary-strip">
                 <span className="summary-chip pass">
                   <KsIconFilledCheck size="14" /> Pass <b>{counts.pass}</b>
@@ -169,8 +174,9 @@ export default function TestConsole({
           {/* Rows */}
           <div className="q-list">
             {group.questions.map((q) => {
-              const resultKnown = evaluated && q.status;
+              const resultKnown = evaluatedIds.has(q.id) && q.status;
               const tag = resultKnown ? statusTag[q.status as EvalStatus] : null;
+              const pending = !resultKnown && (running || evaluatingId === q.id);
               return (
                 <div
                   key={q.id}
@@ -187,7 +193,13 @@ export default function TestConsole({
                   </span>
                   <span className="q-question">{q.question}</span>
                   <span className="q-status">{resultKnown && <KsIconFilledCheck size="18" />}</span>
-                  <span>{tag ? <KsTag variant={tag.variant} size="sm">{tag.label}</KsTag> : <span className="q-status-empty">—</span>}</span>
+                  <span>
+                    {tag ? (
+                      <KsTag variant={tag.variant} size="sm">{tag.label}</KsTag>
+                    ) : (
+                      <span className="q-status-empty">{pending ? 'Running…' : '—'}</span>
+                    )}
+                  </span>
                 </div>
               );
             })}
