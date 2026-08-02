@@ -1,17 +1,22 @@
 import { useState } from 'react';
 import TopBar from './components/TopBar';
-import IconRail from './components/IconRail';
+import GlobalNav from './components/GlobalNav';
 import FinSidebar from './components/FinSidebar';
+import Dashboard from './components/Dashboard';
 import TestConsole from './components/TestConsole';
 import EvaluatePanel from './components/EvaluatePanel';
 import { GenerateQuestionsModal, AddManuallyModal, ComingSoonModal } from './components/AddQuestionModals';
 import { testGroup as initialGroup, type ReviewVerdict, type TestQuestion } from './data';
+import type { Route } from './routes';
 
 type AddAction = 'manual' | 'generate' | 'csv' | 'inbox';
 
 const RUN_DELAY_MS = 1100;
 
 export default function App() {
+  // Boots into the hub so the demo opens on the test console; the dashboard
+  // stays one click away in the global nav.
+  const [route, setRoute] = useState<Route>('hub');
   const [questions, setQuestions] = useState<TestQuestion[]>(initialGroup.questions);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [evaluated, setEvaluated] = useState(false);
@@ -68,28 +73,35 @@ export default function App() {
     <div className="app">
       <TopBar />
       <div className="app-body">
-        <IconRail />
-        <main className="shell-content">
-          <FinSidebar />
-          <div className="workspace">
-            <TestConsole
-              group={{ ...initialGroup, questions }}
-              selectedId={selectedId}
-              onSelect={handleSelect}
-              onAddAction={setModal}
-              evaluated={evaluated}
-              running={running}
-              onRunEvaluation={handleRunEvaluation}
-            />
-            {/* key resets per-question local state (expanded sources) */}
-            <EvaluatePanel
-              key={selected?.id ?? 'none'}
-              question={selected}
-              evaluated={evaluated}
-              onReview={handleReview}
-            />
-          </div>
-        </main>
+        <GlobalNav route={route} onNavigate={setRoute} />
+
+        {route === 'dashboard' ? (
+          <main className="shell-content is-dashboard">
+            <Dashboard />
+          </main>
+        ) : (
+          <main className="shell-content">
+            <FinSidebar />
+            <div className="workspace">
+              <TestConsole
+                group={{ ...initialGroup, questions }}
+                selectedId={selectedId}
+                onSelect={handleSelect}
+                onAddAction={setModal}
+                evaluated={evaluated}
+                running={running}
+                onRunEvaluation={handleRunEvaluation}
+              />
+              {/* key resets per-question local state (expanded sources) */}
+              <EvaluatePanel
+                key={selected?.id ?? 'none'}
+                question={selected}
+                evaluated={evaluated}
+                onReview={handleReview}
+              />
+            </div>
+          </main>
+        )}
       </div>
 
       <GenerateQuestionsModal
