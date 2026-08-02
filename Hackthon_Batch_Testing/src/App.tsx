@@ -115,8 +115,9 @@ export default function App() {
                 running={running}
                 onRunEvaluation={handleRunEvaluation}
               />
+              {/* Nothing to inspect until the batch has questions in it. */}
               {/* key resets per-question local state (expanded sources) */}
-              {inspectorOpen && (
+              {inspectorOpen && questions.length > 0 && (
                 <EvaluatePanel
                   key={selected?.id ?? 'none'}
                   question={selected}
