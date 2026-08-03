@@ -90,11 +90,11 @@ export default function App() {
   const activeGroup = groups.find((group) => group.id === activeGroupId) ?? groups[0];
   const { questions, selectedId, evaluatedIds } = activeGroup;
   const selected = questions.find((q) => q.id === selectedId) ?? null;
-  const onboardingStep: TestOnboardingStep = questions.length === 0
+  const onboardingStep: TestOnboardingStep | null = questions.length === 0
     ? 'add_questions'
-    : evaluatedIds.size === 0
-      ? 'auto_test'
-      : 'review_answer';
+    : evaluatedIds.size > 0
+      ? 'review_answer'
+      : null;
 
   useEffect(() => {
     if (route === 'hub' && agentSection === 'test' && testOnboardingStatus === 'inactive') {

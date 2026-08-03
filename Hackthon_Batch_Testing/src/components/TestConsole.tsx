@@ -22,7 +22,7 @@ import {
 } from '../data';
 
 export type TestingAs = 'preview' | 'new' | 'existing';
-export type TestOnboardingStep = 'add_questions' | 'auto_test' | 'review_answer';
+export type TestOnboardingStep = 'add_questions' | 'review_answer';
 
 const testingAsLabels: Record<TestingAs, string> = {
   preview: 'Preview user',
@@ -140,22 +140,17 @@ export default function TestConsole({
     },
     { good: 0, acceptable: 0, poor: 0 } as Record<AnswerRating, number>
   );
-  const onboardingStepNumber = onboardingStep === 'add_questions' ? 1 : onboardingStep === 'auto_test' ? 2 : 3;
+  const onboardingStepNumber = onboardingStep === 'add_questions' ? 1 : 2;
   const completedOnboardingSteps = onboardingStepNumber - 1;
   const onboardingCopy = onboardingStep === 'add_questions'
     ? {
         title: 'Start with questions your customers really ask',
         detail: 'Choose a source below. Generating from recent conversations is the quickest way to build a representative test.',
       }
-    : onboardingStep === 'auto_test'
-      ? {
-          title: 'Testing runs automatically',
-          detail: `${evaluatedIds.size} of ${group.questions.length} answered. Questions run top-to-bottom while the first question stays selected.`,
-        }
-      : {
-          title: 'Review the first answer',
-          detail: 'The AI rating is a suggestion. Use the Inspector to record your human rating while remaining questions continue in the background.',
-        };
+    : {
+        title: 'Review the first answer',
+        detail: 'The AI rating is a suggestion. Use the Inspector to record your human rating while remaining questions continue in the background.',
+      };
 
   return (
     <section ref={consoleRef} className="panel console" aria-label="Test console">
@@ -257,8 +252,8 @@ export default function TestConsole({
 
       {onboardingStep && (
         <div className={`test-onboarding is-step-${onboardingStepNumber}`} role="status" aria-live="polite">
-          <div className="test-onboarding-progress" aria-label={`${completedOnboardingSteps} of 3 onboarding steps complete`}>
-            {[1, 2, 3].map((step) => (
+          <div className="test-onboarding-progress" aria-label={`${completedOnboardingSteps} of 2 onboarding steps complete`}>
+            {[1, 2].map((step) => (
               <span
                 key={step}
                 className={`${step === onboardingStepNumber ? 'is-current' : ''}${step < onboardingStepNumber ? ' is-complete' : ''}`}
@@ -270,7 +265,7 @@ export default function TestConsole({
             ))}
           </div>
           <div className="test-onboarding-copy">
-            <small>{completedOnboardingSteps} of 3 complete</small>
+            <small>{completedOnboardingSteps} of 2 complete</small>
             <strong>{onboardingCopy.title}</strong>
             <p>{onboardingCopy.detail}</p>
           </div>
