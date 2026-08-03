@@ -22,6 +22,7 @@ import {
 } from '../data';
 
 export type TestingAs = 'preview' | 'new' | 'existing';
+export type TestOnboardingStep = 'add_questions' | 'auto_test' | 'review_answer';
 
 const testingAsLabels: Record<TestingAs, string> = {
   preview: 'Preview user',
@@ -50,11 +51,11 @@ const ratingTag: Record<AnswerRating, { variant: 'success' | 'warning' | 'error'
 
 const reviewState = (question: TestQuestion, aiRating: AnswerRating | null) => {
   if (!question.humanRating) return { label: 'Needs review', className: 'is-pending' };
-  if (!isHumanReviewComplete(question)) return { label: 'Incomplete', className: 'is-incomplete' };
   const humanLabel = ANSWER_RATING_LABELS[question.humanRating];
-  return question.humanRating === aiRating
-    ? { label: `Reviewed · ${humanLabel}`, className: 'is-reviewed' }
-    : { label: `Overridden · ${humanLabel}`, className: 'is-overridden' };
+  return {
+    label: `${question.humanRating === aiRating ? 'Reviewed' : 'Overridden'} · ${humanLabel}`,
+    className: `is-rating-${question.humanRating}`,
+  };
 };
 
 interface Props {
@@ -74,6 +75,8 @@ interface Props {
   onSwitchGroup: (id: string) => void;
   onCreateGroup: () => void;
   onManageAction: (action: ManageAction) => void;
+  onboardingStep?: TestOnboardingStep | null;
+  onSkipOnboarding?: () => void;
 }
 
 export default function TestConsole({
@@ -91,6 +94,8 @@ export default function TestConsole({
   onSwitchGroup,
   onCreateGroup,
   onManageAction,
+  onboardingStep = null,
+  onSkipOnboarding,
 }: Props) {
   const consoleRef = useRef<HTMLElement>(null);
   const wasRunningRef = useRef(false);
@@ -125,18 +130,31 @@ export default function TestConsole({
     return () => window.clearTimeout(timer);
   }, [evaluatedIds.size, group.questions.length, running]);
 
-  // Human ratings take precedence once complete; unreviewed questions fall
-  // back to the AI proposal so the summary always covers the full test.
+  // The summary represents human decisions only. AI-proposed ratings remain
+  // visible in their own table column and do not inflate these counts.
   const counts = group.questions.reduce(
     (acc, q) => {
       if (!evaluatedIds.has(q.id)) return acc;
-      const aiRating = ratingFromStatus(q.status);
-      const effectiveRating = isHumanReviewComplete(q) ? q.humanRating : aiRating;
-      if (effectiveRating) acc[effectiveRating] += 1;
+      if (isHumanReviewComplete(q) && q.humanRating) acc[q.humanRating] += 1;
       return acc;
     },
     { good: 0, acceptable: 0, poor: 0 } as Record<AnswerRating, number>
   );
+  const onboardingStepNumber = onboardingStep === 'add_questions' ? 1 : onboardingStep === 'auto_test' ? 2 : 3;
+  const onboardingCopy = onboardingStep === 'add_questions'
+    ? {
+        title: 'Start with questions your customers really ask',
+        detail: 'Choose a source below. Generating from recent conversations is the quickest way to build a representative test.',
+      }
+    : onboardingStep === 'auto_test'
+      ? {
+          title: 'Testing runs automatically',
+          detail: `${evaluatedIds.size} of ${group.questions.length} answered. Questions run top-to-bottom while the first question stays selected.`,
+        }
+      : {
+          title: 'Review the first answer',
+          detail: 'The AI rating is a suggestion. Use the Inspector to record your human rating while remaining questions continue in the background.',
+        };
 
   return (
     <section ref={consoleRef} className="panel console" aria-label="Test console">
@@ -233,6 +251,29 @@ export default function TestConsole({
             </div>
           </div>
           <hr className="console-divider" />
+        </div>
+      )}
+
+      {onboardingStep && (
+        <div className={`test-onboarding is-step-${onboardingStepNumber}`} role="status" aria-live="polite">
+          <div className="test-onboarding-progress" aria-label={`Onboarding step ${onboardingStepNumber} of 3`}>
+            {[1, 2, 3].map((step) => (
+              <span
+                key={step}
+                className={`${step === onboardingStepNumber ? 'is-current' : ''}${step < onboardingStepNumber ? ' is-complete' : ''}`}
+                aria-current={step === onboardingStepNumber ? 'step' : undefined}
+                aria-label={step < onboardingStepNumber ? `Step ${step} complete` : step === onboardingStepNumber ? `Step ${step} current` : `Step ${step}`}
+              >
+                {step < onboardingStepNumber ? '✓' : step}
+              </span>
+            ))}
+          </div>
+          <div className="test-onboarding-copy">
+            <small>Step {onboardingStepNumber} of 3</small>
+            <strong>{onboardingCopy.title}</strong>
+            <p>{onboardingCopy.detail}</p>
+          </div>
+          <button type="button" className="test-onboarding-skip" onClick={onSkipOnboarding}>Skip onboarding</button>
         </div>
       )}
 

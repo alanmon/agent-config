@@ -1,7 +1,6 @@
 import { useState, useEffect, Fragment, type ReactNode } from 'react';
 import { KsIconButton, KsInput, KsEmptyState, KsTag } from '@byted-keystone/react';
 import {
-  KsIconArrowLeft,
   KsIconRefresh,
   KsIconClose,
   KsIconWand,
@@ -11,17 +10,16 @@ import {
   KsIconPlayCircle,
   KsIconFilledCheck,
   KsIconFilledClose,
-  KsIconFilledLightbulb,
 } from '@fe-infra/keystone-icons-react';
 import {
   ANSWER_RATING_LABELS,
   IMPROVEMENT_REASON_LABELS,
-  isHumanReviewComplete,
   ratingFromStatus,
   type AnswerRating,
   type AnswerSource,
   type ImprovementReason,
   type InstructionTrace,
+  type RecommendationTarget,
   type TestQuestion,
 } from '../data';
 
@@ -49,40 +47,13 @@ const reasonOptions = Object.entries(IMPROVEMENT_REASON_LABELS).map(([value, lab
   label,
 }));
 
-const fallbackRecommendations: Record<ImprovementReason, { action: string; detail: string }> = {
-  content_gap: {
-    action: 'Update the relevant knowledge content',
-    detail: 'Add or revise a focused knowledge article so the agent can retrieve complete, current facts for this question.',
-  },
-  needs_clarification: {
-    action: 'Add clarification guidance',
-    detail: 'Tell the agent which customer details it must collect before answering ambiguous or context-dependent questions.',
-  },
-  instruction_conflict: {
-    action: 'Resolve conflicting guidance',
-    detail: 'Consolidate the competing rules into one ordered instruction that makes prerequisites, risk disclosure, and escalation explicit.',
-  },
-  tone: {
-    action: 'Adjust tone guidance',
-    detail: 'Add an example response and describe the level of empathy, confidence, and formality expected for this situation.',
-  },
-  length: {
-    action: 'Define answer-length guidance',
-    detail: 'Specify which details are required and when the agent should use a concise answer versus a structured explanation.',
-  },
-  language: {
-    action: 'Review language support',
-    detail: 'Confirm language detection and translation settings, then add localized guidance where the response should differ by region.',
-  },
-  tool_error: {
-    action: 'Review the automation configuration',
-    detail: 'Check the tool trigger, required inputs, permissions, and fallback behavior, then rerun this question.',
-  },
-  other: {
-    action: 'Review this answer with the configuration owner',
-    detail: 'Use the internal note to capture the expected behavior, then update the most relevant content, guidance, or automation.',
-  },
-};
+// Keeps the original demo group useful after hot updates: earlier in-memory
+// groups stored this scenario before its supporting Rules were authored.
+const bloodThinnerRules: AnswerSource[] = [
+  { kind: 'guidance', title: 'Procedure safety standard', meta: 'Active rule · Do not advise medication changes' },
+  { kind: 'guidance', title: 'Pre-consultation eligibility policy', meta: 'Active rule · Provider review required before surgical procedures' },
+  { kind: 'guidance', title: 'Medication escalation guidance', meta: 'Active rule · Escalate anticoagulant questions to a provider' },
+];
 
 const suggestedReasonFor = (question: TestQuestion): ImprovementReason => {
   if (question.rootCause?.label === 'Knowledge gap') return 'content_gap';
@@ -176,6 +147,9 @@ interface Props {
     id: string,
     changes: Partial<Pick<TestQuestion, 'humanRating' | 'ratingReason' | 'reviewNote'>>,
   ) => void;
+  onRecommendationAction?: (question: TestQuestion, target: RecommendationTarget, action: string, detail: string) => void;
+  onRerun?: (id: string) => void;
+  showReviewOnboarding?: boolean;
 }
 
 /** Matches the console's run animation so a re-run feels like the same operation. */
@@ -187,127 +161,81 @@ export default function EvaluatePanel({
   evaluating = false,
   onClose,
   onReviewChange,
+  onRecommendationAction,
+  onRerun,
+  showReviewOnboarding = false,
 }: Props) {
   // Prototype re-run: there is no backend, so the panel just plays the working
   // state and lands back on the same stored diagnosis.
   const [regenerating, setRegenerating] = useState(false);
-  const [view, setView] = useState<'answer' | 'improve'>('answer');
 
   useEffect(() => {
     if (!regenerating) return;
-    const timer = window.setTimeout(() => setRegenerating(false), REGEN_DELAY_MS);
+    const rerunId = question?.id;
+    const timer = window.setTimeout(() => {
+      setRegenerating(false);
+      if (rerunId) onRerun?.(rerunId);
+    }, REGEN_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [regenerating]);
 
-  useEffect(() => setView('answer'), [question?.id]);
-
   const showResult = evaluated && !!question?.status;
   const aiRating = ratingFromStatus(question?.status ?? null);
-  const reviewComplete = !!question && isHumanReviewComplete(question);
   const failing = question?.status === 'failure' || question?.status === 'knowledge_gap';
   const causeVariant = question?.rootCause
     ? rootCauseVariant[question.rootCause.label] ?? 'warning'
     : 'warning';
   // The review bar keeps the automated assessment distinct from the human
   // decision, so a suggested rating is never mistaken for an approved one.
-  const verdictLabel = question?.rootCause?.label ?? 'Pass';
-  const verdictVariant: 'success' | 'warning' | 'error' = question?.rootCause ? causeVariant : 'success';
   const suggestedReason = question ? suggestedReasonFor(question) : 'other';
-  const recommendationReason = question?.ratingReason ?? suggestedReason;
-  const recommendation = question?.fixSuggestion ?? fallbackRecommendations[recommendationReason];
-  const canImprove = !!question && reviewComplete && question.humanRating !== 'good';
+  const tracedRules: AnswerSource[] = question?.instructions?.map((instruction) => ({
+    kind: 'guidance',
+    title: instruction.rule,
+    meta: `Configured rule · ${instruction.status === 'violated' ? 'Violated in this answer' : 'Followed in this answer'}`,
+  })) ?? [];
+  const rules = question?.guidance.length
+    ? question.guidance
+    : question?.id === 'g3'
+      ? bloodThinnerRules
+      : tracedRules;
+  const knowledge = question?.appliedRecommendation?.target === 'knowledge'
+    && !question.content.some((source) => source.title === question.appliedRecommendation?.title)
+    ? [...question.content, {
+        kind: 'content' as const,
+        title: question.appliedRecommendation.title,
+        meta: 'Newly added · Available to the AI Agent',
+      }]
+    : question?.content ?? [];
   const reviewStatusLabel = !question?.humanRating
     ? 'Needs human review'
-    : !reviewComplete
-      ? 'Incomplete · choose a reason'
-      : question.humanRating === aiRating
-        ? 'AI rating confirmed'
-        : 'AI rating overridden';
+    : question.humanRating === aiRating
+      ? 'AI rating confirmed'
+      : 'AI rating overridden';
+  const startRerun = () => setRegenerating(true);
 
   return (
     <section className="panel evaluate" aria-label="Root cause inspector">
       <div className="eval-head">
-        {view === 'improve' ? (
-          <button type="button" className="improve-back" onClick={() => setView('answer')}>
-            <KsIconArrowLeft size="16" /> Back to answer
-          </button>
-        ) : (
-          <span className="eval-title">Inspector</span>
-        )}
+        <span className="eval-title">Inspector</span>
         <div className="eval-head-actions">
-          {view === 'answer' && (
-            <KsIconButton
-              variant="text"
-              size="sm"
-              aria-label="Re-run evaluation"
-              disabled={!question || !showResult || regenerating}
-              onClick={() => setRegenerating(true)}
-            >
-              <span className={regenerating ? 'is-spinning' : undefined}>
-                <KsIconRefresh size="18" />
-              </span>
-            </KsIconButton>
-          )}
+          <KsIconButton
+            variant="text"
+            size="sm"
+            aria-label="Re-run question"
+            disabled={!question || !showResult || regenerating}
+            onClick={startRerun}
+          >
+            <span className={regenerating ? 'is-spinning' : undefined}>
+              <KsIconRefresh size="18" />
+            </span>
+          </KsIconButton>
           <KsIconButton variant="text" size="sm" aria-label="Close" onClick={onClose}>
             <KsIconClose size="18" />
           </KsIconButton>
         </div>
       </div>
 
-      {view === 'improve' && question && showResult && question.humanRating ? (
-        <div className="improve-view">
-          <div className="improve-view-heading">
-            <span className="improve-view-icon"><KsIconFilledLightbulb size="20" /></span>
-            <div>
-              <h2>Improve this answer</h2>
-              <p>Recommendation tailored to the reviewed answer and attributed root cause.</p>
-            </div>
-          </div>
-
-          <div className="improve-question">{question.question}</div>
-
-          <div className="improve-facts">
-            <div>
-              <span>Human rating</span>
-              <KsTag variant={ratingVariant[question.humanRating]} size="sm">
-                {ANSWER_RATING_LABELS[question.humanRating]}
-              </KsTag>
-            </div>
-            <div>
-              <span>AI diagnosis</span>
-              <KsTag variant={verdictVariant} size="sm">{verdictLabel}</KsTag>
-            </div>
-            {question.ratingReason && (
-              <div className="is-full">
-                <span>Review reason</span>
-                <strong>{IMPROVEMENT_REASON_LABELS[question.ratingReason]}</strong>
-              </div>
-            )}
-          </div>
-
-          {question.rootCause && (
-            <div className={`improve-diagnosis improve-diagnosis-${causeVariant}`}>
-              <span>Why the AI attributed this root cause</span>
-              <p>{question.rootCause.detail}</p>
-            </div>
-          )}
-
-          <div className="improve-recommendation">
-            <div className="improve-recommendation-label">
-              <KsIconWand size="16" /> Recommended change
-            </div>
-            <h3>{recommendation.action}</h3>
-            <p>{recommendation.detail}</p>
-          </div>
-
-          {question.reviewNote && (
-            <div className="improve-note">
-              <span>Internal note</span>
-              <p>{question.reviewNote}</p>
-            </div>
-          )}
-        </div>
-      ) : !question ? (
+      {!question ? (
         <KsEmptyState
           autoCenter
           size="sm"
@@ -375,7 +303,7 @@ export default function EvaluatePanel({
               </div>
             )}
 
-            {/* The AI diagnosis remains visible; the fix is revealed only from Improve. */}
+            {/* Diagnosis and its most relevant configuration action stay together. */}
             {question.rootCause && (
               <div className={`root-cause root-cause-${causeVariant}`}>
                 <div className="root-cause-head">
@@ -385,6 +313,20 @@ export default function EvaluatePanel({
                   </KsTag>
                 </div>
                 <div className="root-cause-detail">{question.rootCause.detail}</div>
+                {question.fixSuggestion && !question.appliedRecommendation && (
+                  <button
+                    type="button"
+                    className="root-cause-action"
+                    onClick={() => onRecommendationAction?.(
+                      question,
+                      question.fixSuggestion!.target,
+                      question.fixSuggestion!.action,
+                      question.fixSuggestion!.detail,
+                    )}
+                  >
+                    {question.fixSuggestion.target === 'knowledge' ? 'Create Knowledge article' : question.fixSuggestion.action}
+                  </button>
+                )}
               </div>
             )}
 
@@ -392,14 +334,20 @@ export default function EvaluatePanel({
             <div className="section-label">This answer uses:</div>
             <UsesRow
               label="Knowledge"
-              items={question.content}
+              items={knowledge}
               defaultOpen={failing}
               emptyText={question.searchEvidence}
             />
-            <UsesRow label="Rules" items={question.guidance} defaultOpen={failing} />
+            <UsesRow label="Rules" items={rules} defaultOpen={failing} />
           </div>
 
           <div className="review-section">
+            {showReviewOnboarding && (
+              <div className="review-onboarding-callout" role="status">
+                <strong>Your turn: review this answer</strong>
+                <span>Choose your rating below. You can optionally add a reason or internal note for context.</span>
+              </div>
+            )}
             <div className="review-heading">
               <div>
                 <strong>Rate the AI response</strong>
@@ -436,17 +384,17 @@ export default function EvaluatePanel({
 
             {question.humanRating === 'poor' && (
               <div className="review-field">
-                <label>Reason for Poor rating <span>Required</span></label>
+                <label>Reason for Poor rating <span>Optional</span></label>
                 <select
                   className="review-reason-select"
                   value={question.ratingReason ?? ''}
                   aria-label="Reason for Poor rating"
                   onChange={(event) => onReviewChange?.(question.id, {
-                    ratingReason: event.target.value as ImprovementReason,
+                    ratingReason: event.target.value ? event.target.value as ImprovementReason : null,
                   })}
                 >
-                  <option value="" disabled>
-                    Select a reason · AI suggests {IMPROVEMENT_REASON_LABELS[suggestedReason]}
+                  <option value="">
+                    Select a reason (optional) · AI suggests {IMPROVEMENT_REASON_LABELS[suggestedReason]}
                   </option>
                   {reasonOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -466,16 +414,6 @@ export default function EvaluatePanel({
               </div>
             )}
 
-            {question.humanRating && question.humanRating !== 'good' && (
-              <button
-                type="button"
-                className="improve-answer-button"
-                disabled={!canImprove}
-                onClick={() => setView('improve')}
-              >
-                <KsIconFilledLightbulb size="16" /> Improve this answer
-              </button>
-            )}
           </div>
         </>
       )}

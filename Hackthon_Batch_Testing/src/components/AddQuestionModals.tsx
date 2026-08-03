@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { KsModal, KsInput, KsButton, KsRadio, KsRadioGroup, KsSelect } from '@byted-keystone/react';
-import { KsIconDelete, KsIconPlus } from '@fe-infra/keystone-icons-react';
-import { CATEGORIES, questionBank, type Category, type TestQuestion } from '../data';
+import { KsIconDelete, KsIconPlus, KsIconWand } from '@fe-infra/keystone-icons-react';
+import { CATEGORIES, questionBank, type Category, type RecommendationTarget, type TestQuestion } from '../data';
 import type { TestingAs } from './TestConsole';
 
 interface GenerateProps {
@@ -365,6 +365,119 @@ export function CreateGroupModal({ open, onCancel, onConfirm }: CreateGroupProps
               </KsRadio>
             </KsRadioGroup>
           </div>
+        </div>
+      }
+    />
+  );
+}
+
+interface ApplyRecommendationProps {
+  open: boolean;
+  target: RecommendationTarget | null;
+  action: string;
+  detail: string;
+  onCancel: () => void;
+  onConfirm: (title: string, content?: string) => void;
+}
+
+const recommendationModalCopy: Record<RecommendationTarget, { title: string; description: string; label: string; placeholder: string; confirmText: string }> = {
+  knowledge: {
+    title: 'Create Knowledge article',
+    description: 'Create a mock knowledge article that this test can use when you re-run it.',
+    label: 'Article title',
+    placeholder: 'e.g. Medication contraindications for cosmetic procedures',
+    confirmText: 'Create article',
+  },
+  rules: {
+    title: 'Update Rules',
+    description: 'Save a mock rules update that this test can use when you re-run it.',
+    label: 'Rules update',
+    placeholder: 'e.g. Require consultation before procedure booking',
+    confirmText: 'Save rules update',
+  },
+  automation: {
+    title: 'Review automation configuration',
+    description: 'Save a mock automation configuration update before re-running this test.',
+    label: 'Configuration update',
+    placeholder: 'e.g. Add consultation handover fallback',
+    confirmText: 'Save configuration',
+  },
+  follow_up: {
+    title: 'Create configuration follow-up',
+    description: 'Record a mock follow-up for the configuration owner before re-running this test.',
+    label: 'Follow-up title',
+    placeholder: 'e.g. Review expected behaviour with the configuration owner',
+    confirmText: 'Save follow-up',
+  },
+};
+
+/** Stages a local configuration change; the question only consumes it when re-run. */
+export function ApplyRecommendationModal({
+  open,
+  target,
+  action,
+  detail,
+  onCancel,
+  onConfirm,
+}: ApplyRecommendationProps) {
+  const copy = target ? recommendationModalCopy[target] : null;
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+
+  useEffect(() => {
+    if (!open || !copy) return;
+    setTitle(action);
+    setContent(
+      target === 'knowledge'
+        ? 'Blood thinners and cosmetic procedures\n\nPatients taking anticoagulants may have a higher risk of bleeding and bruising. Do not advise patients to stop medication. Arrange a provider consultation to review medication, eligibility, and safe next steps before any procedure.'
+        : '',
+    );
+  }, [action, copy, open, target]);
+
+  if (!copy) return null;
+  const trimmed = title.trim();
+  return (
+    <KsModal
+      open={open}
+      title={copy.title}
+      description={copy.description}
+      size="md"
+      confirmable
+      cancelable
+      confirmText={copy.confirmText}
+      cancelText="Cancel"
+      onConfirm={() => {
+        if (!trimmed) return false;
+        onConfirm(trimmed, target === 'knowledge' ? content.trim() : undefined);
+        return undefined;
+      }}
+      onCancel={onCancel}
+      partProps={{ confirmButton: { disabled: !trimmed } }}
+      body={
+        <div className="create-group-body">
+          <div className="gen-field">
+            <div className="improvement-modal-recommendation">
+              <div className="improvement-modal-recommendation-label"><KsIconWand size="15" /> Recommended change</div>
+              <div className="improvement-modal-action">{action}</div>
+              <p className="improvement-modal-detail">{detail}</p>
+            </div>
+          </div>
+          <div className="gen-field">
+            <label className="gen-field-label">{copy.label}</label>
+            <KsInput placeholder={copy.placeholder} value={title} onChange={(value: string) => setTitle(value)} />
+          </div>
+          {target === 'knowledge' && (
+            <div className="gen-field">
+              <label className="gen-field-label">Article content</label>
+              <textarea
+                className="improvement-content-input"
+                value={content}
+                placeholder="Write the information your agent should use for this question."
+                onChange={(event) => setContent(event.target.value)}
+              />
+              <span className="improvement-content-hint">This mock content will be used when you re-run the question.</span>
+            </div>
+          )}
         </div>
       }
     />

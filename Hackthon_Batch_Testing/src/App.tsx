@@ -5,7 +5,7 @@ import FinSidebar from './components/FinSidebar';
 import type { AgentSection } from './components/FinSidebar';
 import Dashboard from './components/Dashboard';
 import AgentDashboard from './components/AgentDashboard';
-import TestConsole, { type ManageAction, type TestingAs } from './components/TestConsole';
+import TestConsole, { type ManageAction, type TestingAs, type TestOnboardingStep } from './components/TestConsole';
 import EvaluatePanel from './components/EvaluatePanel';
 import {
   GenerateQuestionsModal,
@@ -15,6 +15,7 @@ import {
   CreateGroupModal,
   DeleteGroupModal,
   GroupSettingsModal,
+  ApplyRecommendationModal,
   type CreateGroupMethod,
 } from './components/AddQuestionModals';
 import {
@@ -24,11 +25,13 @@ import {
   ratingFromStatus,
   testGroup as initialGroup,
   type TestQuestion,
+  type RecommendationTarget,
 } from './data';
 import type { Route } from './routes';
 
 type AddAction = 'manual' | 'generate' | 'csv';
-type ModalName = AddAction | 'create' | 'rename' | 'delete' | 'settings';
+type ModalName = AddAction | 'create' | 'rename' | 'delete' | 'settings' | 'improvement';
+type TestOnboardingStatus = 'inactive' | 'active' | 'completed' | 'dismissed';
 
 interface SavedGroup {
   id: string;
@@ -71,12 +74,49 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalName | null>(null);
+  const [recommendationDraft, setRecommendationDraft] = useState<{
+    questionId: string;
+    target: RecommendationTarget;
+    action: string;
+    detail: string;
+  } | null>(null);
+  const [rerunToast, setRerunToast] = useState<string | null>(null);
+  const [creationToast, setCreationToast] = useState<string | null>(null);
+  const [testOnboardingStatus, setTestOnboardingStatus] = useState<TestOnboardingStatus>('inactive');
+  const [showOnboardingToast, setShowOnboardingToast] = useState(false);
   // The inspector is dismissable; picking a question brings it back.
   const [inspectorOpen, setInspectorOpen] = useState(true);
 
   const activeGroup = groups.find((group) => group.id === activeGroupId) ?? groups[0];
   const { questions, selectedId, evaluatedIds } = activeGroup;
   const selected = questions.find((q) => q.id === selectedId) ?? null;
+  const onboardingStep: TestOnboardingStep = questions.length === 0
+    ? 'add_questions'
+    : evaluatedIds.size === 0
+      ? 'auto_test'
+      : 'review_answer';
+
+  useEffect(() => {
+    if (route === 'hub' && agentSection === 'test' && testOnboardingStatus === 'inactive') {
+      setTestOnboardingStatus('active');
+    }
+  }, [agentSection, route, testOnboardingStatus]);
+
+  useEffect(() => {
+    if (testOnboardingStatus !== 'active' || onboardingStep !== 'review_answer') return;
+    const hasCompletedReview = questions.some((question) => (
+      evaluatedIds.has(question.id) && isHumanReviewComplete(question)
+    ));
+    if (!hasCompletedReview) return;
+    setTestOnboardingStatus('completed');
+    setShowOnboardingToast(true);
+  }, [evaluatedIds, onboardingStep, questions, testOnboardingStatus]);
+
+  useEffect(() => {
+    if (!showOnboardingToast) return;
+    const timer = window.setTimeout(() => setShowOnboardingToast(false), 4200);
+    return () => window.clearTimeout(timer);
+  }, [showOnboardingToast]);
 
   const updateGroup = (groupId: string, update: (group: SavedGroup) => SavedGroup) => {
     setGroups((previous) => previous.map((group) => (group.id === groupId ? update(group) : group)));
@@ -106,11 +146,6 @@ export default function App() {
     setRunning(true);
     setEvaluatingId(nextQuestion.id);
     setInspectorOpen(true);
-    setGroups((previous) => previous.map((group) => (
-      group.id === groupId && group.selectedId !== nextQuestion.id
-        ? { ...group, selectedId: nextQuestion.id }
-        : group
-    )));
 
     const timer = window.setTimeout(() => {
       updateGroup(groupId, (group) => ({
@@ -221,11 +256,9 @@ export default function App() {
       const finalRating = reviewComplete ? question.humanRating : aiRating;
       const reviewStatus = !question.humanRating
         ? 'Needs review'
-        : !reviewComplete
-          ? 'Incomplete'
-          : question.humanRating === aiRating
-            ? 'Reviewed'
-            : 'Overridden';
+        : question.humanRating === aiRating
+          ? 'Reviewed'
+          : 'Overridden';
       return [
         question.question,
         evaluated ? question.answer : '',
@@ -276,6 +309,93 @@ export default function App() {
     }));
   };
 
+  const handleRecommendationAction = (
+    question: TestQuestion,
+    target: RecommendationTarget,
+    action: string,
+    detail: string,
+  ) => {
+    setRecommendationDraft({ questionId: question.id, target, action, detail });
+    setModal('improvement');
+  };
+
+  const applyRecommendation = (title: string, content?: string) => {
+    if (!recommendationDraft) return;
+    updateActiveGroup((group) => ({
+      ...group,
+      questions: group.questions.map((question) => (
+        question.id === recommendationDraft.questionId
+          ? {
+              ...question,
+              appliedRecommendation: { target: recommendationDraft.target, title, content },
+              content: recommendationDraft.target === 'knowledge'
+                ? [
+                    ...question.content.filter((source) => source.title !== title),
+                    { kind: 'content', title, meta: 'Newly added · Available to the AI Agent' },
+                  ]
+                : question.content,
+            }
+          : question
+      )),
+    }));
+    setModal(null);
+    setRecommendationDraft(null);
+    const label = recommendationDraft.target === 'knowledge' ? 'Knowledge article created' : 'Configuration change saved';
+    setCreationToast(`${label} — ready to use when you re-run this question.`);
+    window.setTimeout(() => setCreationToast(null), 4200);
+  };
+
+  const handleRerun = (id: string) => {
+    let appliedTitle = '';
+    setCreationToast(null);
+    updateActiveGroup((group) => ({
+      ...group,
+      questions: group.questions.map((question) => {
+        if (question.id !== id || !question.appliedRecommendation) return question;
+        const { target, title } = question.appliedRecommendation;
+        appliedTitle = title;
+        if (target === 'knowledge') {
+          const updatedKnowledge = question.content.some((source) => source.title === title)
+            ? question.content.map((source) => source.title === title
+                ? { ...source, meta: 'Newly added · Used in this re-run' }
+                : source)
+            : [...question.content, { kind: 'content' as const, title, meta: 'Newly added · Used in this re-run' }];
+          return {
+            ...question,
+            status: 'pass',
+            answer: 'Blood thinners can affect eligibility and bleeding risk for liposuction. Please do not stop or change medication on your own — your provider will review your medication and arrange a consultation before any procedure.',
+            content: updatedKnowledge,
+            searchEvidence: undefined,
+            rootCause: undefined,
+            fixSuggestion: undefined,
+          };
+        }
+        if (target === 'rules') {
+          return {
+            ...question,
+            status: 'pass',
+            answer: 'I can help arrange a consultation first so your provider can confirm eligibility and discuss potential risks. They can then help you plan the next appropriate appointment.',
+            guidance: [...question.guidance, { kind: 'guidance', title, meta: 'Updated rule · Used in this re-run' }],
+            rootCause: undefined,
+            fixSuggestion: undefined,
+            instructions: question.instructions?.map((instruction) => ({ ...instruction, status: 'followed', detail: 'Updated guidance was followed in this re-run.' })),
+          };
+        }
+        return {
+          ...question,
+          status: 'pass',
+          answer: 'Thanks for your question. The updated configuration guided the next appropriate step for your request.',
+          rootCause: undefined,
+          fixSuggestion: undefined,
+        };
+      }),
+    }));
+    if (appliedTitle) {
+      setRerunToast(`Re-run complete — now using ${appliedTitle}`);
+      window.setTimeout(() => setRerunToast(null), 4200);
+    }
+  };
+
   const handleRouteChange = (nextRoute: Route) => {
     if (nextRoute === 'hub') setAgentSection('dashboard');
     setRoute(nextRoute);
@@ -313,6 +433,8 @@ export default function App() {
                 onSwitchGroup={switchGroup}
                 onCreateGroup={() => setModal('create')}
                 onManageAction={handleManageAction}
+                onboardingStep={testOnboardingStatus === 'active' ? onboardingStep : null}
+                onSkipOnboarding={() => setTestOnboardingStatus('dismissed')}
               />
               {inspectorOpen && questions.length > 0 && (
                 <EvaluatePanel
@@ -321,6 +443,14 @@ export default function App() {
                   evaluated={!!selected && evaluatedIds.has(selected.id)}
                   evaluating={!!selected && evaluatingId === selected.id}
                   onReviewChange={handleReviewChange}
+                  onRecommendationAction={handleRecommendationAction}
+                  onRerun={handleRerun}
+                  showReviewOnboarding={
+                    testOnboardingStatus === 'active'
+                    && onboardingStep === 'review_answer'
+                    && !!selected
+                    && evaluatedIds.has(selected.id)
+                  }
                   onClose={() => setInspectorOpen(false)}
                 />
               )}
@@ -373,6 +503,43 @@ export default function App() {
         description={<span>CSV upload isn't available in this demo. Use <b>Add manually</b> or <b>Generate from conversations</b> instead.</span>}
         onCancel={() => setModal(null)}
       />
+      <ApplyRecommendationModal
+        open={modal === 'improvement'}
+        target={recommendationDraft?.target ?? null}
+        action={recommendationDraft?.action ?? ''}
+        detail={recommendationDraft?.detail ?? ''}
+        onCancel={() => {
+          setModal(null);
+          setRecommendationDraft(null);
+        }}
+        onConfirm={applyRecommendation}
+      />
+      {rerunToast && (
+        <div className="test-complete-toast" role="status" aria-live="polite">
+          <span className="test-complete-toast-icon">✓</span>
+          <div><b>Question re-run complete</b><small>{rerunToast}</small></div>
+        </div>
+      )}
+      {creationToast && (
+        <div className="test-complete-toast" role="status" aria-live="polite">
+          <span className="test-complete-toast-icon">✓</span>
+          <div><b>Change created successfully</b><small>{creationToast}</small></div>
+        </div>
+      )}
+      {showOnboardingToast && (
+        <div className="test-complete-toast onboarding-complete-toast" role="status" aria-live="polite">
+          <span className="test-complete-toast-icon">✓</span>
+          <div><b>Test onboarding complete</b><small>You’re ready to test and review AI Agent answers.</small></div>
+          <button
+            type="button"
+            className="test-complete-toast-close"
+            aria-label="Close onboarding completion message"
+            onClick={() => setShowOnboardingToast(false)}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }

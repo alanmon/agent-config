@@ -49,8 +49,8 @@ export const ratingFromStatus = (status: EvalStatus | null): AnswerRating | null
 };
 
 export const isHumanReviewComplete = (
-  question: Pick<TestQuestion, 'humanRating' | 'ratingReason'>,
-) => !!question.humanRating && (question.humanRating !== 'poor' || !!question.ratingReason);
+  question: Pick<TestQuestion, 'humanRating'>,
+) => !!question.humanRating;
 
 export const CATEGORIES = [
   'Price',
@@ -217,11 +217,23 @@ export interface InstructionTrace {
   detail: string;
 }
 
+/** The local configuration area a recommendation changes in this prototype. */
+export type RecommendationTarget = 'knowledge' | 'rules' | 'automation' | 'follow_up';
+
+/** A saved mock change awaiting (or already used by) a question re-run. */
+export interface AppliedRecommendation {
+  target: RecommendationTarget;
+  title: string;
+  /** Authored mock content for a newly created Knowledge article. */
+  content?: string;
+}
+
 /** What the system recommends doing about the root cause. */
 export interface FixSuggestion {
   /** Short imperative, e.g. "Merge conflicting rules". */
   action: string;
   detail: string;
+  target: RecommendationTarget;
 }
 
 export interface TestQuestion {
@@ -233,7 +245,7 @@ export interface TestQuestion {
   status: EvalStatus | null;
   /** Human rating. Remains separate from the AI-proposed `status`. */
   humanRating: AnswerRating | null;
-  /** Required when the human rating is Poor. */
+  /** Optional context explaining a Poor human rating. */
   ratingReason: ImprovementReason | null;
   /** Optional internal context retained with the test group and CSV export. */
   reviewNote: string;
@@ -252,6 +264,8 @@ export interface TestQuestion {
   instructions?: InstructionTrace[];
   /** Only authored for the two story scenarios. Section hidden when absent. */
   fixSuggestion?: FixSuggestion;
+  /** Local configuration change created from the improvement workflow. */
+  appliedRecommendation?: AppliedRecommendation;
   /** Retrieval evidence shown in Sources when nothing was found. */
   searchEvidence?: string;
 }
@@ -281,7 +295,23 @@ export const questionBank: TestQuestion[] = [
     answer:
       'That’s worth discussing with your provider — blood thinners can affect bruising and healing, so we’ll want to look at your specific medication.',
     content: [],
-    guidance: [],
+    guidance: [
+      {
+        kind: 'guidance',
+        title: 'Procedure safety standard',
+        meta: 'Active rule · Do not advise medication changes',
+      },
+      {
+        kind: 'guidance',
+        title: 'Pre-consultation eligibility policy',
+        meta: 'Active rule · Provider review required before surgical procedures',
+      },
+      {
+        kind: 'guidance',
+        title: 'Medication escalation guidance',
+        meta: 'Active rule · Escalate anticoagulant questions to a provider',
+      },
+    ],
     searchEvidence: 'Searched 142 documents · 0 matches for “blood thinners contraindication”',
     rootCause: {
       label: 'Knowledge gap',
@@ -292,6 +322,7 @@ export const questionBank: TestQuestion[] = [
       action: 'Create a medication contraindications KB article',
       detail:
         'Add a knowledge base article covering which medications — anticoagulants in particular — contraindicate liposuction and injectable treatments, so this class of question stops falling through.',
+      target: 'knowledge',
     },
   },
   {
@@ -306,7 +337,23 @@ export const questionBank: TestQuestion[] = [
     answer:
       'Great! I’ve booked your liposuction appointment for Tuesday at 2 PM. You’ll love the results — liposuction is one of our most popular procedures!',
     content: [],
-    guidance: [],
+    guidance: [
+      {
+        kind: 'guidance',
+        title: 'Never book procedures without prior consultation',
+        meta: 'Configured rule · Consultation screening is required before booking',
+      },
+      {
+        kind: 'guidance',
+        title: 'Do not guarantee or promise results',
+        meta: 'Configured rule · Avoid explicit or implied outcome promises',
+      },
+      {
+        kind: 'guidance',
+        title: 'Always mention potential risks for surgical procedures',
+        meta: 'Configured rule · Surgical answers must include a risk disclosure',
+      },
+    ],
     instructions: [
       {
         rule: 'Never book procedures without prior consultation',
@@ -333,6 +380,7 @@ export const questionBank: TestQuestion[] = [
       action: 'Merge conflicting rules',
       detail:
         'Rule A “assist with booking” conflicts with Rule B “require consultation first”. Suggested merge: “For procedure booking requests, first schedule a consultation. Do not promise specific results. Always mention that all procedures carry potential risks.”',
+      target: 'rules',
     },
   },
 
