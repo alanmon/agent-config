@@ -141,6 +141,7 @@ export default function TestConsole({
     { good: 0, acceptable: 0, poor: 0 } as Record<AnswerRating, number>
   );
   const onboardingStepNumber = onboardingStep === 'add_questions' ? 1 : onboardingStep === 'auto_test' ? 2 : 3;
+  const completedOnboardingSteps = onboardingStepNumber - 1;
   const onboardingCopy = onboardingStep === 'add_questions'
     ? {
         title: 'Start with questions your customers really ask',
@@ -256,7 +257,7 @@ export default function TestConsole({
 
       {onboardingStep && (
         <div className={`test-onboarding is-step-${onboardingStepNumber}`} role="status" aria-live="polite">
-          <div className="test-onboarding-progress" aria-label={`Onboarding step ${onboardingStepNumber} of 3`}>
+          <div className="test-onboarding-progress" aria-label={`${completedOnboardingSteps} of 3 onboarding steps complete`}>
             {[1, 2, 3].map((step) => (
               <span
                 key={step}
@@ -269,7 +270,7 @@ export default function TestConsole({
             ))}
           </div>
           <div className="test-onboarding-copy">
-            <small>Step {onboardingStepNumber} of 3</small>
+            <small>{completedOnboardingSteps} of 3 complete</small>
             <strong>{onboardingCopy.title}</strong>
             <p>{onboardingCopy.detail}</p>
           </div>
