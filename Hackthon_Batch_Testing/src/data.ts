@@ -293,7 +293,7 @@ export const questionBank: TestQuestion[] = [
     ratingReason: null,
     reviewNote: '',
     answer:
-      'That’s worth discussing with your provider — blood thinners can affect bruising and healing, so we’ll want to look at your specific medication.',
+      "That's worth discussing with your doctor. Blood thinners can affect bruising and healing, so we'll want to look at your specific medication.",
     content: [],
     guidance: [
       {

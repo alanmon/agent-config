@@ -344,7 +344,7 @@ export default function EvaluatePanel({
           <div className="review-section">
             {showReviewOnboarding && (
               <div className="review-onboarding-callout" role="status">
-                <strong>Your turn: review this answer</strong>
+                <strong>Human rating pending</strong>
                 <span>Choose your rating below. You can optionally add a reason or internal note for context.</span>
               </div>
             )}
