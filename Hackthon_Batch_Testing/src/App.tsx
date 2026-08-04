@@ -518,12 +518,28 @@ export default function App() {
         <div className="test-complete-toast" role="status" aria-live="polite">
           <span className="test-complete-toast-icon">✓</span>
           <div><b>Question re-run complete</b><small>{rerunToast}</small></div>
+          <button
+            type="button"
+            className="test-complete-toast-close"
+            aria-label="Close question re-run message"
+            onClick={() => setRerunToast(null)}
+          >
+            ×
+          </button>
         </div>
       )}
       {creationToast && (
         <div className="test-complete-toast" role="status" aria-live="polite">
           <span className="test-complete-toast-icon">✓</span>
           <div><b>Change created successfully</b><small>{creationToast}</small></div>
+          <button
+            type="button"
+            className="test-complete-toast-close"
+            aria-label="Close creation message"
+            onClick={() => setCreationToast(null)}
+          >
+            ×
+          </button>
         </div>
       )}
       {showOnboardingToast && (
