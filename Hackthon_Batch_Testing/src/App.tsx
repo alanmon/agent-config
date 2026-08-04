@@ -3,6 +3,15 @@ import TopBar from './components/TopBar';
 import GlobalNav from './components/GlobalNav';
 import FinSidebar from './components/FinSidebar';
 import type { AgentSection } from './components/FinSidebar';
+
+const agentSectionLabels: Record<AgentSection, string> = {
+  dashboard: 'Dashboard',
+  knowledge: 'Knowledge base',
+  rules: 'Rules',
+  test: 'Test',
+  deploy: 'Chat history',
+  setting: 'Settings',
+};
 import Dashboard from './components/Dashboard';
 import AgentDashboard from './components/AgentDashboard';
 import TestConsole, { type ManageAction, type TestingAs, type TestOnboardingStep } from './components/TestConsole';
@@ -192,7 +201,7 @@ export default function App() {
         humanRating: null,
         ratingReason: null,
         reviewNote: '',
-        answer: 'Thanks for your question. Based on the clinic guidance available, our team can help with the next appropriate step.',
+        answer: "I don't have the exact details on that right now, but our front desk team would be happy to help you with this directly!",
         content: [],
         guidance: [],
       })),
@@ -457,7 +466,7 @@ export default function App() {
             </div>
             ) : (
               <section className="agent-section-placeholder">
-                <h1>{agentSection === 'setting' ? 'Setting' : `${agentSection[0].toUpperCase()}${agentSection.slice(1)}`}</h1>
+                <h1>{agentSectionLabels[agentSection]}</h1>
                 <p>This area is ready for the next prototype workflow.</p>
               </section>
             )}
@@ -499,8 +508,8 @@ export default function App() {
       />
       <ComingSoonModal
         open={modal === 'csv'}
-        title="Import questions from CSV file"
-        description={<span>CSV upload isn't available in this demo. Use <b>Add manually</b> or <b>Generate from conversations</b> instead.</span>}
+        title="Import questions from CSV"
+        description={<span>CSV upload is disabled for this demo. Use <b>Auto-generate</b> or <b>Add manually</b> instead.</span>}
         onCancel={() => setModal(null)}
       />
       <ApplyRecommendationModal

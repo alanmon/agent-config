@@ -25,9 +25,9 @@ export type TestingAs = 'preview' | 'new' | 'existing';
 export type TestOnboardingStep = 'add_questions' | 'review_answer';
 
 const testingAsLabels: Record<TestingAs, string> = {
-  preview: 'Preview user',
-  new: 'New user',
-  existing: 'Existing user',
+  preview: 'Guest',
+  new: 'New customer',
+  existing: 'Existing customer',
 };
 
 type AddAction = 'manual' | 'generate' | 'csv';
@@ -50,7 +50,7 @@ const ratingTag: Record<AnswerRating, { variant: 'success' | 'warning' | 'error'
 };
 
 const reviewState = (question: TestQuestion, aiRating: AnswerRating | null) => {
-  if (!question.humanRating) return { label: 'Needs review', className: 'is-pending' };
+  if (!question.humanRating) return { label: 'Pending', className: 'is-pending' };
   const humanLabel = ANSWER_RATING_LABELS[question.humanRating];
   return {
     label: `${question.humanRating === aiRating ? 'Reviewed' : 'Overridden'} · ${humanLabel}`,
@@ -145,11 +145,11 @@ export default function TestConsole({
   const onboardingCopy = onboardingStep === 'add_questions'
     ? {
         title: 'Start with questions your customers really ask',
-        detail: 'Choose a source below. Generating from recent conversations is the quickest way to build a representative test.',
+        detail: "Choose how you'd like to add test questions. Auto-generating from past conversations is the fastest way to build your first test.",
       }
     : {
-        title: 'Review the first answer',
-        detail: 'The AI rating is a suggestion. Use the Inspector to record your human rating while remaining questions continue in the background.',
+        title: 'Start with questions your customers actually ask',
+        detail: "Choose how you'd like to add test questions. Auto-generating from past conversations is the fastest way to build your first test.",
       };
 
   return (
@@ -188,7 +188,7 @@ export default function TestConsole({
                         onCreateGroup();
                       }}
                     >
-                      + Create new group
+                      + Create new agent
                     </button>
                   </div>
                 </details>
@@ -201,11 +201,11 @@ export default function TestConsole({
                 </summary>
                 <div className="action-menu-popover">
                   {([
+                    ['rename', 'Rename agent'],
+                    ['create', '+ Create new agent'],
+                    ['delete', 'Delete agent'],
                     ['settings', 'Settings'],
-                    ['rename', 'Rename group'],
                     ['export', 'Get CSV report'],
-                    ['delete', 'Delete group'],
-                    ['create', '+ Create new group'],
                   ] as Array<[ManageAction, string]>).map(([action, label]) => (
                     <button
                       type="button"
@@ -223,13 +223,13 @@ export default function TestConsole({
               </details>
               <details className={`action-menu${group.questions.length >= 50 ? ' is-disabled' : ''}`}>
                 <summary className="toolbar-menu-trigger is-primary">
-                  <span className="chip-inner"><KsIconPlus size="16" /> Add questions</span>
+                  <span className="chip-inner"><KsIconPlus size="16" /> Add question</span>
                 </summary>
                 <div className="action-menu-popover">
                   {([
-                    ['generate', 'Generate from past conversations'],
-                    ['manual', 'Add questions manually'],
-                    ['csv', 'Upload a CSV file'],
+                    ['generate', 'Auto-generate'],
+                    ['manual', 'Add manually'],
+                    ['csv', 'Upload CSV'],
                   ] as Array<[AddAction, string]>).map(([action, label]) => (
                     <button
                       type="button"
@@ -276,8 +276,8 @@ export default function TestConsole({
       {group.questions.length === 0 ? (
         <div className="question-start">
           <div className="question-start-heading">
-            <h2>Let’s start by adding questions</h2>
-            <p>Choose the method that best matches what you want to test.</p>
+            <h2>Add questions to test your agent</h2>
+            <p>Choose a method to build your test suite.</p>
           </div>
 
           <div className="question-start-options">
@@ -286,8 +286,8 @@ export default function TestConsole({
                 <span className="question-option-icon"><KsIconWand size="22" /></span>
                 <span className="question-option-badge">Recommended</span>
               </div>
-              <h3>Generate from conversations</h3>
-              <p><b>Best for most teams.</b> Create up to 50 representative questions from recent customer conversations.</p>
+              <h3>Auto-generate</h3>
+              <p><b>Best for fast setup.</b> Create up to 50 test questions from the knowledge base and recent conversations.</p>
               <div className="question-option-action">
                 <button type="button" className="question-option-button is-primary" onClick={() => onAddAction('generate')}>
                   Generate questions
@@ -300,7 +300,7 @@ export default function TestConsole({
                 <span className="question-option-icon"><KsIconEdit size="22" /></span>
               </div>
               <h3>Add manually</h3>
-              <p><b>Best for edge cases.</b> Add exact questions for new policies, compliance checks, or scenarios without history.</p>
+              <p><b>Best for edge cases.</b> Add custom questions to test specific new rules or tricky policies.</p>
               <div className="question-option-action">
                 <button type="button" className="question-option-button" onClick={() => onAddAction('manual')}>
                   Add manually
@@ -313,7 +313,7 @@ export default function TestConsole({
                 <span className="question-option-icon"><KsIconUpload size="22" /></span>
               </div>
               <h3>Upload CSV file</h3>
-              <p><b>Best for repeatable tests.</b> Import a prepared, single-column CSV containing up to 50 questions.</p>
+              <p><b>Best for bulk testing.</b> Import a spreadsheet of test questions to run full evaluations all at once.</p>
               <div className="question-option-action">
                 <button type="button" className="question-option-button" onClick={() => onAddAction('csv')}>
                   Upload CSV
@@ -388,7 +388,7 @@ export default function TestConsole({
             >
               AI rating <KsIconHelp size="14" />
             </span>
-            <span>Human review</span>
+            <span>Human rating</span>
           </div>
 
           {/* Rows */}
@@ -427,7 +427,6 @@ export default function TestConsole({
                     {tag ? (
                       <span className="ai-rating">
                         <KsTag variant={tag.variant} size="sm">{tag.label}</KsTag>
-                        <small>AI</small>
                       </span>
                     ) : (
                       <span className="q-status-empty">{answering ? 'Answering…' : queued ? 'Queued' : '—'}</span>

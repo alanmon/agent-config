@@ -293,7 +293,7 @@ export const questionBank: TestQuestion[] = [
     ratingReason: null,
     reviewNote: '',
     answer:
-      'That’s worth discussing with your provider — blood thinners can affect bruising and healing, so we’ll want to look at your specific medication.',
+      'That’s worth discussing with your doctor. Blood thinners can affect bruising and healing, so we’ll want to look at your specific medication.',
     content: [],
     guidance: [
       {
@@ -312,11 +312,11 @@ export const questionBank: TestQuestion[] = [
         meta: 'Active rule · Escalate anticoagulant questions to a provider',
       },
     ],
-    searchEvidence: 'Searched 142 documents · 0 matches for “blood thinners contraindication”',
+    searchEvidence: 'Searched 142 articles · No matches for "blood thinners"',
     rootCause: {
-      label: 'Knowledge gap',
+      label: 'Knowledge base gap',
       detail:
-        'No medication-contraindication article exists for anticoagulants and liposuction/injectables eligibility. Nothing in the knowledge base covers this combination.',
+        "Your knowledge base doesn't have an article about performing liposuction on patients taking blood thinners.\n\nThe AI gave a safe generic answer, but adding this topic will improve accuracy.",
     },
     fixSuggestion: {
       action: 'Create a medication contraindications KB article',

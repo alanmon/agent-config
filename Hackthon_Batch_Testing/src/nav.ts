@@ -27,13 +27,13 @@ export const navEntries: NavEntry[] = [
   { value: 'campaigns', label: 'Campaigns', icon: 'campaigns' },
   {
     value: 'assets',
-    label: 'Assets',
+    label: 'Lead Agent Hub',
     icon: 'assets',
     children: [
       { value: 'events-manager', label: 'Events Manager' },
       { value: 'catalog-manager', label: 'Catalog Manager' },
       { value: 'creative-library', label: 'Creative Library' },
-      { value: 'lead-agent-hub', label: 'Lead Agent Hub', route: 'hub' },
+      { value: 'lead-agent-hub', label: 'Agent Studio', route: 'hub' },
     ],
   },
   { value: 'custom-reports', label: 'Custom reports', icon: 'reports' },

@@ -207,7 +207,7 @@ export default function EvaluatePanel({
       }]
     : question?.content ?? [];
   const reviewStatusLabel = !question?.humanRating
-    ? 'Needs human review'
+    ? "Review the AI's response and rating to set your final rating."
     : question.humanRating === aiRating
       ? 'AI rating confirmed'
       : 'AI rating overridden';
@@ -216,7 +216,7 @@ export default function EvaluatePanel({
   return (
     <section className="panel evaluate" aria-label="Root cause inspector">
       <div className="eval-head">
-        <span className="eval-title">Inspector</span>
+        <span className="eval-title">Evaluation</span>
         <div className="eval-head-actions">
           <KsIconButton
             variant="text"
@@ -288,7 +288,7 @@ export default function EvaluatePanel({
                 <span className="fin-mark">
                   <KsIconWand size="14" />
                 </span>
-                AI Agent
+                Aura Med Spa Clinic agent
               </div>
               <div className="fin-answer-text">{renderRich(question.answer)}</div>
             </div>
@@ -312,7 +312,11 @@ export default function EvaluatePanel({
                     {question.rootCause.label}
                   </KsTag>
                 </div>
-                <div className="root-cause-detail">{question.rootCause.detail}</div>
+                <div className="root-cause-detail">
+                  {question.rootCause.detail.split('\n\n').map((paragraph, index) => (
+                    <p key={index}>{paragraph}</p>
+                  ))}
+                </div>
                 {question.fixSuggestion && !question.appliedRecommendation && (
                   <button
                     type="button"
@@ -324,16 +328,16 @@ export default function EvaluatePanel({
                       question.fixSuggestion!.detail,
                     )}
                   >
-                    {question.fixSuggestion.target === 'knowledge' ? 'Create Knowledge article' : question.fixSuggestion.action}
+                    {question.fixSuggestion.target === 'knowledge' ? 'Fix knowledge gap' : question.fixSuggestion.action}
                   </button>
                 )}
               </div>
             )}
 
             {/* 3 — Sources. */}
-            <div className="section-label">This answer uses:</div>
+            <div className="section-label">This response uses:</div>
             <UsesRow
-              label="Knowledge"
+              label="Knowledge base"
               items={knowledge}
               defaultOpen={failing}
               emptyText={question.searchEvidence}
@@ -344,18 +348,18 @@ export default function EvaluatePanel({
           <div className="review-section">
             {showReviewOnboarding && (
               <div className="review-onboarding-callout" role="status">
-                <strong>Your turn: review this answer</strong>
-                <span>Choose your rating below. You can optionally add a reason or internal note for context.</span>
+                <strong>Human rating pending</strong>
+                <span>Review the AI's response and set the final rating for this test question.</span>
               </div>
             )}
             <div className="review-heading">
               <div>
-                <strong>Rate the AI response</strong>
+                <strong>Give human rating</strong>
                 <span>{reviewStatusLabel}</span>
               </div>
               {aiRating && (
                 <span className="ai-suggested-rating">
-                  AI suggested
+                  AI rating
                   <KsTag variant={ratingVariant[aiRating]} size="sm">
                     {ANSWER_RATING_LABELS[aiRating]}
                   </KsTag>

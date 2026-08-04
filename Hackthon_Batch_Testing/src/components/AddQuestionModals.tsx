@@ -43,7 +43,7 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
   }
   const availableCountOptions = selectableCounts
     .sort((a, b) => a - b)
-    .map((value) => ({ value, label: `${value} questions` }));
+    .map((value) => ({ value, label: `${value}` }));
   const generatedTotal = Math.min(questionCount, sourcePool.length, 50);
 
   useEffect(() => {
@@ -89,8 +89,8 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
   return (
     <KsModal
       open={open}
-      title="Generate questions from past conversations"
-      description="Create a realistic test set from the questions customers have recently asked."
+      title="Auto-generate test questions"
+      description="Create a realistic test suite based on real customer interactions, like lead forms, emails, and other conversations."
       size="md"
       width={600}
       confirmable
@@ -110,8 +110,8 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
               gap={12}
               onChange={(value) => setSource(String(value) as GenerationSource)}
             >
-              <KsRadio value="all">From all conversations</KsRadio>
-              <KsRadio value="topic" disabled={availableTopics.length === 0}>By topic</KsRadio>
+              <KsRadio value="all">All conversations</KsRadio>
+              <KsRadio value="topic" disabled={availableTopics.length === 0}>Specific topics</KsRadio>
             </KsRadioGroup>
           </div>
 
@@ -130,7 +130,7 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
 
           <div className="gen-config-grid">
             <div className="gen-field">
-              <label className="gen-field-label">Conversation period</label>
+              <label className="gen-field-label">Time period</label>
               <KsSelect
                 value={lookback}
                 options={lookbackOptions}
@@ -231,8 +231,8 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
   return (
     <KsModal
       open={open}
-      title="Add questions manually"
-      description="Enter customer questions to see how your agent responds. Press Enter to start another."
+      title="Add test questions manually"
+      description="Enter questions your customers might ask to see how your agent responds."
       size="md"
       confirmable
       cancelable
@@ -263,7 +263,7 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
                     }}
                     placeholder={
                       i === 0
-                        ? "e.g. Can I get filler if I'm currently breastfeeding?"
+                        ? 'e.g., What is your cancellation policy for Botox appointments?'
                         : 'Add another question'
                     }
                     value={d.text}
@@ -285,11 +285,11 @@ export function AddManuallyModal({ open, onCancel, onConfirm }: AddManuallyProps
           <div className="manual-modal-footer-row">
             <KsButton variant="text" size="sm" onClick={addRow}>
               <span className="chip-inner">
-                <KsIconPlus size="14" /> Add another question
+                <KsIconPlus size="14" /> Add question
               </span>
             </KsButton>
             <span className="manual-modal-count">
-              {filled.length} ready to add
+              {filled.length} questions entered
             </span>
           </div>
         </div>

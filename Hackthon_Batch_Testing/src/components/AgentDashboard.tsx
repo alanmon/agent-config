@@ -3,19 +3,19 @@ import { KsIconCalendar, KsIconHelp, KsIconPlus } from '@fe-infra/keystone-icons
 
 const metrics = [
   {
-    label: 'AI agent deflection rate',
+    label: 'Automated resolution rate',
     value: '68.4%',
     detail: '3,421 of 5,002 conversations',
     change: '+8.2% vs previous period',
   },
   {
-    label: 'AI agent resolution rate',
+    label: 'Resolution success rate',
     value: '76.1%',
     detail: '2,846 of 3,740 conversations',
     change: '+5.4% vs previous period',
   },
   {
-    label: 'AI agent CSAT score',
+    label: 'Agent CSAT score',
     value: '4.7 / 5',
     detail: 'Based on 1,284 ratings',
     change: '+0.3 vs previous period',
@@ -29,8 +29,8 @@ export default function AgentDashboard() {
     <section className="agent-hub-dashboard" aria-label="Lead Agent Hub dashboard">
       <header className="agent-dashboard-head">
         <div>
-          <h1>Performance</h1>
-          <p>Track how your AI agent is helping customers and improving support outcomes.</p>
+          <h1>Dashboard</h1>
+          <p>High-level metrics on how your agent is handling customer inquiries and test readiness.</p>
         </div>
       </header>
 

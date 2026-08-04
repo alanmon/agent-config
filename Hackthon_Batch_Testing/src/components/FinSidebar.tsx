@@ -5,11 +5,11 @@ export type AgentSection = 'dashboard' | 'knowledge' | 'rules' | 'test' | 'deplo
 
 const navItems: Array<{ value: AgentSection; label: string }> = [
   { value: 'dashboard', label: 'Dashboard' },
-  { value: 'knowledge', label: 'Knowledge' },
+  { value: 'knowledge', label: 'Knowledge base' },
   { value: 'rules', label: 'Rules' },
   { value: 'test', label: 'Test' },
-  { value: 'deploy', label: 'Deploy' },
-  { value: 'setting', label: 'Setting' },
+  { value: 'deploy', label: 'Chat history' },
+  { value: 'setting', label: 'Settings' },
 ];
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
 /** Feature-level navigation shown beside the global Ads Manager rail. */
 export default function FinSidebar({ active, onNavigate }: Props) {
   return (
-    <KsSideNavigation className="agent-sidebar" title={<span>Lead Agent Hub</span>}>
+    <KsSideNavigation className="agent-sidebar" title={<span>Agent Studio</span>}>
       {navItems.map((item) => (
         <KsNavItem
           key={item.value}
