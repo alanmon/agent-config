@@ -240,7 +240,7 @@ body {
   background: transparent;
 }
 
-/* ---------- Lead agent hub navigation ---------- */
+/* ---------- Agent Studio navigation ---------- */
 .agent-sidebar {
   flex: 0 0 200px;
   width: 200px;
@@ -252,7 +252,7 @@ body {
   text-transform: capitalize;
 }
 
-/* ---------- Lead Agent Hub dashboard ---------- */
+/* ---------- Agent Studio dashboard ---------- */
 .agent-hub-dashboard,
 .agent-section-placeholder {
   flex: 1;

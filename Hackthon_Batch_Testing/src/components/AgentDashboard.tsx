@@ -26,7 +26,7 @@ const conversationBars = [58, 66, 61, 74, 72, 81, 78, 86, 84, 92, 88, 96];
 
 export default function AgentDashboard() {
   return (
-    <section className="agent-hub-dashboard" aria-label="Lead Agent Hub dashboard">
+    <section className="agent-hub-dashboard" aria-label="Agent Studio dashboard">
       <header className="agent-dashboard-head">
         <div>
           <h1>Performance</h1>

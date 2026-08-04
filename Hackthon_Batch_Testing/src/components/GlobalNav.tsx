@@ -32,7 +32,7 @@ interface Props {
 
 /**
  * Collapsed 60px rail that expands into a full menu on hover — the bridge between
- * the dashboard (screen 1) and the Lead agent hub (screen 3).
+ * the dashboard (screen 1) and Agent Studio (screen 3).
  */
 export default function GlobalNav({ route, onNavigate }: Props) {
   const [expanded, setExpanded] = useState(false);

@@ -61,7 +61,7 @@ const csvCell = (value: string) => {
 
 export default function App() {
   // Start on the homepage dashboard; the Test console remains available from
-  // Assets → Lead agent hub in the global navigation.
+  // Assets → Agent Studio in the global navigation.
   const [route, setRoute] = useState<Route>('dashboard');
   const [agentSection, setAgentSection] = useState<AgentSection>('dashboard');
   const [groups, setGroups] = useState<SavedGroup[]>([

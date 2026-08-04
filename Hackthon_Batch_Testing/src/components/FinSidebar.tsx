@@ -1,6 +1,6 @@
 import { KsNavItem, KsSideNavigation } from '@byted-keystone/react';
 
-/** Flat navigation for the Lead agent hub. */
+/** Flat navigation for Agent Studio. */
 export type AgentSection = 'dashboard' | 'knowledge' | 'rules' | 'test' | 'deploy' | 'setting';
 
 const navItems: Array<{ value: AgentSection; label: string }> = [
@@ -20,7 +20,7 @@ interface Props {
 /** Feature-level navigation shown beside the global Ads Manager rail. */
 export default function FinSidebar({ active, onNavigate }: Props) {
   return (
-    <KsSideNavigation className="agent-sidebar" title={<span>Lead Agent Hub</span>}>
+    <KsSideNavigation className="agent-sidebar" title={<span>Agent Studio</span>}>
       {navItems.map((item) => (
         <KsNavItem
           key={item.value}
