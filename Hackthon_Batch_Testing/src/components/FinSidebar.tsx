@@ -9,7 +9,7 @@ const navItems: Array<{ value: AgentSection; label: string }> = [
   { value: 'rules', label: 'Rules' },
   { value: 'test', label: 'Test' },
   { value: 'deploy', label: 'Deploy' },
-  { value: 'setting', label: 'Setting' },
+  { value: 'setting', label: 'Settings' },
 ];
 
 interface Props {

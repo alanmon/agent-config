@@ -287,7 +287,7 @@ export default function TestConsole({
                 <span className="question-option-badge">Recommended</span>
               </div>
               <h3>Generate from conversations</h3>
-              <p><b>Best for most teams.</b> Create up to 50 representative questions from recent customer conversations.</p>
+              <p><b>Best for most teams.</b> Create representative questions from recent customer conversations.</p>
               <div className="question-option-action">
                 <button type="button" className="question-option-button is-primary" onClick={() => onAddAction('generate')}>
                   Generate questions
@@ -313,7 +313,7 @@ export default function TestConsole({
                 <span className="question-option-icon"><KsIconUpload size="22" /></span>
               </div>
               <h3>Upload CSV file</h3>
-              <p><b>Best for repeatable tests.</b> Import a prepared, single-column CSV containing up to 50 questions.</p>
+              <p><b>Best for repeatable tests.</b> Import a prepared, single-column CSV of test questions.</p>
               <div className="question-option-action">
                 <button type="button" className="question-option-button" onClick={() => onAddAction('csv')}>
                   Upload CSV

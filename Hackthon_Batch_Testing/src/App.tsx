@@ -457,7 +457,7 @@ export default function App() {
             </div>
             ) : (
               <section className="agent-section-placeholder">
-                <h1>{agentSection === 'setting' ? 'Setting' : `${agentSection[0].toUpperCase()}${agentSection.slice(1)}`}</h1>
+                <h1>{agentSection === 'setting' ? 'Settings' : `${agentSection[0].toUpperCase()}${agentSection.slice(1)}`}</h1>
                 <p>This area is ready for the next prototype workflow.</p>
               </section>
             )}
