@@ -456,6 +456,14 @@ export default function TestConsole({
             <b>Test complete</b>
             <small>{group.questions.length} questions answered and rated</small>
           </span>
+          <button
+            type="button"
+            className="test-complete-toast-close"
+            aria-label="Close test completion message"
+            onClick={() => setShowCompleteToast(false)}
+          >
+            ×
+          </button>
         </div>
       )}
     </section>
