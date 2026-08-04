@@ -1,33 +1,35 @@
-import { useState } from 'react';
 import { KsNavItem, KsSideNavigation } from '@byted-keystone/react';
 
-const brandItems = [
-  { value: 'showcase', label: 'Brand showcase', isNew: true },
-  { value: 'tentpole', label: 'Tentpole package', isNew: true },
-  { value: 'pulse', label: 'Pulse lineup', isNew: true },
-  { value: 'search', label: 'Branded search hub' },
-  { value: 'planner', label: 'Planner' },
-  { value: 'missions', label: 'Mission manager' },
+/** Flat navigation for Agent Studio. */
+export type AgentSection = 'dashboard' | 'knowledge' | 'rules' | 'test' | 'deploy' | 'setting';
+
+const navItems: Array<{ value: AgentSection; label: string }> = [
+  { value: 'dashboard', label: 'Dashboard' },
+  { value: 'knowledge', label: 'Knowledge' },
+  { value: 'rules', label: 'Rules' },
+  { value: 'test', label: 'Test' },
+  { value: 'deploy', label: 'Deploy' },
+  { value: 'setting', label: 'Settings' },
 ];
 
-/** Feature-level navigation shown beside the global Ads Manager rail. */
-export default function FinSidebar() {
-  const [active, setActive] = useState('showcase');
+interface Props {
+  active: AgentSection;
+  onNavigate: (section: AgentSection) => void;
+}
 
+/** Feature-level navigation shown beside the global Ads Manager rail. */
+export default function FinSidebar({ active, onNavigate }: Props) {
   return (
-    <KsSideNavigation className="brand-sidebar" title={<span>Brand hub</span>}>
-      {brandItems.map((item) => (
+    <KsSideNavigation className="agent-sidebar" title={<span>Agent Studio</span>}>
+      {navItems.map((item) => (
         <KsNavItem
           key={item.value}
           value={item.value}
-          size="sm"
+          size="md"
           active={active === item.value}
-          onClick={() => setActive(item.value)}
+          onClick={() => onNavigate(item.value)}
         >
-          <span className="brand-nav-label">
-            <span>{item.label}</span>
-            {item.isNew && <span className="new-badge">New</span>}
-          </span>
+          {item.label}
         </KsNavItem>
       ))}
     </KsSideNavigation>

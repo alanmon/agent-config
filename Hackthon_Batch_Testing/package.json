@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:file": "vite build --config vite.preview.config.mjs && node scripts/inline-preview.mjs"
   },
   "dependencies": {
     "@byted-keystone/core": "^1.1.67",
