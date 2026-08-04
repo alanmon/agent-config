@@ -110,8 +110,8 @@ export function GenerateQuestionsModal({ open, existingIds, onCancel, onConfirm 
               gap={12}
               onChange={(value) => setSource(String(value) as GenerationSource)}
             >
-              <KsRadio value="all">From all conversations</KsRadio>
-              <KsRadio value="topic" disabled={availableTopics.length === 0}>By topic</KsRadio>
+              <KsRadio value="all">All conversations</KsRadio>
+              <KsRadio value="topic" disabled={availableTopics.length === 0}>Specific topics</KsRadio>
             </KsRadioGroup>
           </div>
 
